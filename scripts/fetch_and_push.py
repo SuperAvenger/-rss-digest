@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-RSS 每日摘要 - OpenRouter AI 翻译 + 总结版本
-翻译 + 总结：OpenRouter (stepfun/step-3.5-flash:free)
-不再使用 MyMemory（每日 5000 字限制）
+RSS 每日摘要 - AI 翻译 + 总结版本
+使用：OpenRouter (google/gemma-2-9b-it:free 或 qwen/qwen-2.5-72b-instruct)
 """
 
 import json
@@ -19,10 +18,11 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
 
-# OpenRouter API 配置
+# OpenRouter API 配置 - 改用支持中文更好的模型
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
 OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = "stepfun/step-3.5-flash:free"
+# 改用 Qwen 模型（对中文支持更好）
+OPENROUTER_MODEL = "qwen/qwen-2.5-72b-instruct"
 
 def load_feeds():
     """加载 RSS 源配置"""
@@ -32,11 +32,8 @@ def load_feeds():
 
 def ai_translate_and_summarize(title, content):
     """
-    调用 OpenRouter API 一步完成：翻译 + 总结
-    模型：stepfun/step-3.5-flash:free（免费）
-    
-    如果是中文，直接总结
-    如果是英文，先翻译再总结
+    调用 OpenRouter API 翻译 + 总结
+    强制要求翻译为中文
     """
     if not content:
         return f"📰 {title}"
@@ -48,37 +45,35 @@ def ai_translate_and_summarize(title, content):
     # 检测是否英文
     is_english = not re.search(r'[\u4e00-\u9fff]', title + clean_content)
     
-    # 截取前 1000 字（避免 token 超限）
-    clean_content = clean_content[:1000]
+    # 如果不是英文，直接总结
+    if not is_english:
+        # 清理无意义内容
+        clean_content = re.sub(r'📰', '', clean_content)
+        if len(clean_content) > 10:
+            return clean_content[:120] + ('...' if len(clean_content) > 120 else '')
+        return title
     
-    if is_english:
-        prompt = f"""作为新闻编辑，请将以下英文新闻翻译成中文并总结：
+    # 截取前 800 字
+    clean_content = clean_content[:800]
+    
+    # 强制翻译提示词
+    prompt = f"""你是一个专业的新闻翻译和编辑。你的任务是将英文新闻翻译成简洁的中文摘要。
 
-英文标题：{title}
-英文内容：{clean_content}
-
-要求：
-1. 先翻译标题和内容
-2. 用 60-100 字总结核心事实（谁、做了什么、结果如何）
-3. 语言简洁，适合简报阅读
-4. 保留关键数据和人名
-5. 输出纯中文，不要有英文（人名和专有名词除外）
-6. 不要添加"这篇新闻"、"这篇文章"等冗余词
-
-中文总结："""
-    else:
-        prompt = f"""作为新闻编辑，请总结以下中文新闻：
-
+【英文原文】
 标题：{title}
 内容：{clean_content}
 
-要求：
-1. 用 60-100 字总结核心事实（谁、做了什么、结果如何）
-2. 语言简洁，适合简报阅读
-3. 保留关键数据和人名
-4. 不要添加"这篇新闻"、"这篇文章"等冗余词
+【任务要求】
+1. 必须将标题和内容翻译成中文
+2. 用 60-100 字概括核心内容
+3. 保留关键数据、人名、公司名
+4. 输出必须是纯中文，不要保留英文句子
+5. 不要添加"这篇文章"、"该新闻"等冗余词
 
-总结："""
+【输出格式】
+直接输出翻译后的中文摘要，不要有其他说明。
+
+【中文翻译】"""
 
     try:
         response = requests.post(
@@ -91,7 +86,10 @@ def ai_translate_and_summarize(title, content):
             },
             json={
                 'model': OPENROUTER_MODEL,
-                'messages': [{'role': 'user', 'content': prompt}],
+                'messages': [
+                    {'role': 'system', 'content': '你是一个专业的新闻翻译。你必须将英文内容翻译成中文。如果用户输入英文，你必须用中文回复。'},
+                    {'role': 'user', 'content': prompt}
+                ],
                 'max_tokens': 200,
                 'temperature': 0.3
             },
@@ -102,23 +100,28 @@ def ai_translate_and_summarize(title, content):
             result = response.json()
             summary = result['choices'][0]['message']['content'].strip()
             
-            # 清理可能的引号
+            # 清理引号
             summary = summary.strip('"\'')
             
-            # 如果总结太长，截取
+            # 验证：如果还是英文，说明翻译失败
+            if re.search(r'[A-Za-z]{20,}', summary):
+                print(f"  ⚠️ 翻译失败，返回的仍是英文")
+                # 尝试简单翻译
+                return f"[英文] {title[:60]}..."
+            
+            # 长度控制
             if len(summary) > 120:
                 summary = summary[:117] + '...'
             
             return summary
         else:
-            print(f"  ⚠️ AI 失败：{response.status_code}")
-            # 降级：返回原文
-            return f"{title} ({len(clean_content)}字)"
+            print(f"  ⚠️ API 失败：{response.status_code}")
+            print(f"  响应：{response.text[:200]}")
+            return f"[API 错误] {title[:50]}..."
             
     except Exception as e:
-        print(f"  ⚠️ AI 异常：{e}")
-        # 降级：返回原文
-        return f"{title} ({len(clean_content)}字)"
+        print(f"  ⚠️ 异常：{e}")
+        return f"[错误] {title[:50]}..."
 
 def is_quality_article(title, summary, config):
     """判断文章质量"""
@@ -166,10 +169,9 @@ def fetch_feeds(feeds_config):
     total_fetched = 0
     category_stats = {}
     
-    print(f"\n🤖 AI 处理：使用 OpenRouter (stepfun/step-3.5-flash:free)")
-    print(f"   功能：翻译 + 总结 一步完成")
+    print(f"\n🤖 AI 翻译：使用 OpenRouter ({OPENROUTER_MODEL})")
+    print(f"   模型特点：支持中文，翻译质量好")
     print(f"   免费额度：充足")
-    print(f"   输出长度：60-100 字/条")
     print("=" * 70)
     
     for feed_config in feeds_config['feeds']:
@@ -206,11 +208,15 @@ def fetch_feeds(feeds_config):
                 match_score = match_keywords(title, summary, keywords)
                 
                 # AI 翻译 + 总结
-                print(f"  🤖 处理：{title[:30]}...")
+                if is_english:
+                    print(f"  🤖 翻译：{title[:30]}...")
+                else:
+                    print(f"  📝 总结：{title[:30]}...")
+                
                 brief = ai_translate_and_summarize(title, summary)
                 category_stats[category]['ai_processed'] += 1
                 
-                # 短暂延迟，避免 API 限流
+                # 短暂延迟
                 time.sleep(0.2)
                 
                 article = {
@@ -310,7 +316,7 @@ def format_message(articles):
         lines.append("")
     
     lines.append("=" * 50)
-    lines.append(f"💡 _AI 翻译 + 智能总结 (OpenRouter 免费)_")
+    lines.append(f"💡 _AI 翻译 + 智能总结 (Qwen 72B 模型)_")
     
     return '\n'.join(lines)
 
@@ -374,7 +380,7 @@ def main():
     print(f"   - 每类最多：15 条")
     print(f"   - 最小标题长度：{config['settings'].get('min_title_length', 8)}")
     print(f"   - 黑名单：{', '.join(config['settings'].get('blacklist_keywords', []))}")
-    print(f"   - AI 处理：✅ OpenRouter (翻译 + 总结)")
+    print(f"   - AI 模型：{OPENROUTER_MODEL}")
     print("=" * 70)
     
     articles = fetch_feeds(config)
