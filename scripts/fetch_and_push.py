@@ -294,9 +294,14 @@ def push_to_feishu(message):
     """推送到飞书"""
     webhook = os.environ.get('FEISHU_WEBHOOK')
     
+    print(f"\n🔍 调试信息:")
+    print(f"   Webhook 配置：{'✅ 已配置' if webhook else '❌ 未配置'}")
+    if webhook:
+        print(f"   Webhook 前缀：{webhook[:50]}...")
+    
     if not webhook:
         print("⚠️ 未配置飞书 Webhook，仅打印消息")
-        print("\n" + message)
+        print("\n" + message[:500] + "...")
         return
     
     try:
@@ -320,13 +325,18 @@ def push_to_feishu(message):
             }
         }
         
+        print(f"   发送请求到飞书...")
         response = requests.post(webhook, json=payload, timeout=30)
         
+        print(f"   响应状态码：{response.status_code}")
+        
         if response.status_code == 200:
-            print("✅ 飞书推送成功")
+            result = response.json()
+            print(f"✅ 飞书推送成功")
+            print(f"   响应：{result}")
         else:
             print(f"❌ 飞书推送失败：{response.status_code}")
-            print(response.text)
+            print(f"   响应内容：{response.text}")
             
     except Exception as e:
         print(f"❌ 推送异常：{e}")
