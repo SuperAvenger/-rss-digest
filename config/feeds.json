@@ -74,80 +74,79 @@
       "language": "en"
     },
     {
-      "name": "彭博社",
-      "url": "https://www.bloomberg.com/feed",
+      "name": "Yahoo Finance",
+      "url": "https://finance.yahoo.com/news/rssindex",
       "category": "📈 财经资讯",
       "weight": 10,
       "keywords": [],
       "language": "en"
     },
     {
-      "name": "路透社财经",
-      "url": "https://www.reuters.com/finance/feed",
+      "name": "MarketWatch",
+      "url": "https://www.marketwatch.com/rss",
       "category": "📈 财经资讯",
       "weight": 9,
       "keywords": [],
       "language": "en"
     },
     {
-      "name": "CNBC",
-      "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+      "name": "Investing.com",
+      "url": "https://cn.investing.com/rss/news.rss",
       "category": "📈 财经资讯",
       "weight": 8,
+      "keywords": []
+    },
+    {
+      "name": "BBC News",
+      "url": "http://feeds.bbci.co.uk/news/rss.xml",
+      "category": "🌍 国际新闻",
+      "weight": 10,
       "keywords": [],
       "language": "en"
     },
     {
-      "name": "BBC 国际",
-      "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
+      "name": "Reuters World",
+      "url": "https://www.reutersagency.com/feed/",
       "category": "🌍 国际新闻",
       "weight": 9,
       "keywords": [],
       "language": "en"
     },
     {
-      "name": "CNN 国际",
-      "url": "http://rss.cnn.com/rss/edition.rss",
+      "name": "AP News",
+      "url": "https://apnews.com/rss",
       "category": "🌍 国际新闻",
       "weight": 8,
       "keywords": [],
       "language": "en"
     },
     {
-      "name": "Guardian",
-      "url": "https://www.theguardian.com/world/rss",
-      "category": "🌍 国际新闻",
-      "weight": 8,
-      "keywords": [],
-      "language": "en"
-    },
-    {
-      "name": "FierceWireless",
-      "url": "https://www.fiercewireless.com/rss.xml",
+      "name": "Fierce Telecom",
+      "url": "https://www.fiercetelecom.com/rss.xml",
       "category": "📡 通信运营商",
       "weight": 10,
       "keywords": [],
       "language": "en"
     },
     {
-      "name": "Light Reading",
-      "url": "https://www.lightreading.com/rss.xml",
+      "name": "RCR Wireless",
+      "url": "https://www.rcrwireless.com/feed",
       "category": "📡 通信运营商",
       "weight": 9,
       "keywords": [],
       "language": "en"
     },
     {
-      "name": "Reuters 审计",
-      "url": "https://www.reuters.com/business/finance/accounting-audit/feed",
+      "name": "Journal of Accountancy",
+      "url": "https://www.journalofaccountancy.com/feed/",
       "category": "🔍 审计领域",
       "weight": 10,
       "keywords": [],
       "language": "en"
     },
     {
-      "name": "Accounting Today",
-      "url": "https://www.accountingtoday.com/rss",
+      "name": "Accounting Web",
+      "url": "https://www.accountingweb.co.uk/rss",
       "category": "🔍 审计领域",
       "weight": 8,
       "keywords": [],
@@ -158,6 +157,6 @@
     "max_items_per_feed": 15,
     "max_per_category": 15,
     "min_title_length": 8,
-    "blacklist_keywords": ["广告", "推广", "赞助", "直播", "招聘", "活动", "会议", "培训", "课程", "优惠", "促销", "抽奖", "福利", "enroll", "webinar", "sponsored", "advertisement"]
+    "blacklist_keywords": ["广告", "推广", "赞助", "直播", "招聘", "活动", "会议", "培训", "课程", "优惠", "促销", "抽奖", "福利", "enroll", "webinar", "sponsored", "advertisement", "subscribe", "subscription"]
   }
 }
