@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-RSS 每日摘要 - 智能筛选 + 翻译 + 简报总结版本
+RSS 每日摘要 - 免费翻译 + AI 智能总结版本
+翻译：MyMemory 免费 API
+总结：OpenRouter (stepfun/step-3.5-flash:free)
 """
 
 import json
@@ -17,6 +19,11 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
 
+# OpenRouter API 配置
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
+OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = "stepfun/step-3.5-flash:free"
+
 def load_feeds():
     """加载 RSS 源配置"""
     config_path = Path(__file__).parent.parent / 'config' / 'feeds.json'
@@ -25,8 +32,7 @@ def load_feeds():
 
 def translate_text(text, target_lang='zh'):
     """
-    翻译英文到中文
-    使用 MyMemory 免费翻译 API
+    翻译英文到中文 - MyMemory 免费 API
     """
     if not text:
         return text
@@ -36,9 +42,7 @@ def translate_text(text, target_lang='zh'):
         return text
     
     try:
-        # 截取前 400 字翻译
         text_to_translate = text[:400]
-        
         url = "https://api.mymemory.translated.net/get"
         params = {
             "q": text_to_translate,
@@ -51,7 +55,6 @@ def translate_text(text, target_lang='zh'):
             result = response.json()
             translated = result.get('responseData', {}).get('translatedText', text)
             
-            # 如果翻译失败或返回原文
             if not translated or translated == text:
                 return text
             
@@ -64,6 +67,95 @@ def translate_text(text, target_lang='zh'):
     except Exception as e:
         print(f"  ⚠️ 翻译异常：{e}")
         return text
+
+def ai_summarize(title, content):
+    """
+    调用 OpenRouter API 生成新闻简报总结
+    模型：stepfun/step-3.5-flash:free（免费）
+    """
+    if not content:
+        return f"📰 {title}"
+    
+    # 清理 HTML 标签
+    clean_content = re.sub(r'<[^>]+>', '', content)
+    clean_content = re.sub(r'\s+', ' ', clean_content).strip()
+    
+    # 截取前 800 字（避免 token 超限）
+    clean_content = clean_content[:800]
+    
+    prompt = f"""作为新闻编辑，请用 60-100 字总结以下新闻：
+
+标题：{title}
+内容：{clean_content}
+
+要求：
+1. 提取核心事实（谁、做了什么、结果如何）
+2. 语言简洁，适合简报阅读
+3. 保留关键数据和人名
+4. 输出纯中文，不要有英文（人名和专有名词除外）
+5. 不要添加"这篇新闻"、"这篇文章"等冗余词
+
+总结："""
+
+    try:
+        response = requests.post(
+            OPENROUTER_ENDPOINT,
+            headers={
+                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://github.com/SuperAvenger/rss-digest',
+                'X-Title': 'RSS Daily Digest'
+            },
+            json={
+                'model': OPENROUTER_MODEL,
+                'messages': [{'role': 'user', 'content': prompt}],
+                'max_tokens': 150,
+                'temperature': 0.3
+            },
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            summary = result['choices'][0]['message']['content'].strip()
+            
+            # 清理可能的引号
+            summary = summary.strip('"\'')
+            
+            # 如果总结太长，截取
+            if len(summary) > 120:
+                summary = summary[:117] + '...'
+            
+            return summary
+        else:
+            print(f"  ⚠️ AI 总结失败：{response.status_code}")
+            # 降级到简单总结
+            return simple_summarize(title, clean_content)
+            
+    except Exception as e:
+        print(f"  ⚠️ AI 总结异常：{e}")
+        # 降级到简单总结
+        return simple_summarize(title, clean_content)
+
+def simple_summarize(title, content):
+    """
+    简单总结（降级方案）
+    当 AI API 失败时使用
+    """
+    if not content:
+        return f"📰 {title}"
+    
+    # 按句号分割，取前 1-2 句
+    sentences = re.split(r'[.!?。！？]', content)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
+    
+    if sentences:
+        brief = '. '.join(sentences[:2])
+        if len(brief) > 120:
+            brief = brief[:117] + '...'
+        return brief
+    
+    return f"📰 {title[:60]}..."
 
 def is_quality_article(title, summary, config):
     """判断文章质量"""
@@ -93,42 +185,6 @@ def match_keywords(title, summary, keywords):
     
     return matches / len(keywords) if keywords else 0
 
-def generate_news_brief(title, summary, max_length=120):
-    """
-    生成新闻简报式总结
-    提取关键信息，而不是简单截取
-    """
-    if not summary:
-        return f"📰 {title}"
-    
-    # 清理 HTML 标签
-    clean = re.sub(r'<[^>]+>', '', summary)
-    clean = re.sub(r'\s+', ' ', clean).strip()
-    
-    # 清理作者信息
-    clean = re.sub(r'作者 [丨|].*?编辑 [丨|].*?\s*', '', clean)
-    clean = re.sub(r'作者 [丨|].*?\s*', '', clean)
-    clean = re.sub(r'By\s+.*?\|', '', clean)
-    
-    # 清理无意义前缀
-    clean = re.sub(r'^\s*(Summary|摘要|简介|Introduction)[:：]?\s*', '', clean, flags=re.IGNORECASE)
-    
-    # 提取关键句（按句号分割，取第一句）
-    sentences = re.split(r'[.!?。！？]', clean)
-    sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
-    
-    if sentences:
-        # 取前 1-2 句作为摘要
-        brief = '. '.join(sentences[:2])
-        if len(brief) > max_length:
-            brief = brief[:max_length-3] + '...'
-        return brief
-    
-    # 如果没有合适的句子，直接截取
-    if len(clean) > max_length:
-        return clean[:max_length-3] + '...'
-    return clean if clean else f"📰 {title}"
-
 def fetch_feed_with_headers(url):
     """使用自定义 Headers 抓取 RSS"""
     try:
@@ -147,6 +203,11 @@ def fetch_feeds(feeds_config):
     total_fetched = 0
     category_stats = {}
     
+    print(f"\n🤖 AI 总结：使用 OpenRouter (stepfun/step-3.5-flash:free)")
+    print(f"   免费额度：充足")
+    print(f"   总结长度：60-100 字/条")
+    print("=" * 70)
+    
     for feed_config in feeds_config['feeds']:
         try:
             print(f"\n📰 抓取：{feed_config['name']} ({feed_config['category']})")
@@ -163,7 +224,7 @@ def fetch_feeds(feeds_config):
             is_english = feed_config.get('language', 'zh') == 'en'
             
             if category not in category_stats:
-                category_stats[category] = {'fetched': 0, 'passed': 0, 'failed': 0, 'translated': 0}
+                category_stats[category] = {'fetched': 0, 'passed': 0, 'failed': 0, 'translated': 0, 'summarized': 0}
             
             for entry in feed.entries[:settings.get('max_items_per_feed', 15)]:
                 total_fetched += 1
@@ -182,14 +243,16 @@ def fetch_feeds(feeds_config):
                 
                 # 翻译英文内容
                 if is_english:
-                    print(f"  🌐 翻译：{title[:40]}...")
                     title = translate_text(title)
                     summary = translate_text(summary)
                     category_stats[category]['translated'] += 1
-                    time.sleep(0.15)  # 避免 API 限流
+                    time.sleep(0.1)
                 
-                # 生成简报式摘要
-                brief = generate_news_brief(title, summary)
+                # AI 生成简报总结
+                print(f"  🤖 总结：{title[:30]}...")
+                brief = ai_summarize(title, summary)
+                category_stats[category]['summarized'] += 1
+                time.sleep(0.1)  # 避免 API 限流
                 
                 article = {
                     'category': category,
@@ -214,8 +277,7 @@ def fetch_feeds(feeds_config):
     print("=" * 70)
     for cat, stats in category_stats.items():
         status = "✅" if stats['passed'] > 0 else "❌"
-        trans_info = f" (翻译{stats['translated']}条)" if stats['translated'] > 0 else ""
-        print(f"{status} {cat}: 抓取{stats['fetched']}条 → 通过{stats['passed']}条 → 过滤{stats['failed']}条{trans_info}")
+        print(f"{status} {cat}: 抓取{stats['fetched']}条 → 通过{stats['passed']}条 → 翻译{stats['translated']}条 → AI 总结{stats['summarized']}条")
     
     # 按分类分组
     by_category = {}
@@ -233,6 +295,7 @@ def fetch_feeds(feeds_config):
     
     total_passed = sum(len(items) for items in by_category.values())
     print(f"\n✅ 总计：{total_fetched} 条 → {total_passed} 条优质文章")
+    print(f"🤖 AI 总结：{sum(s['summarized'] for s in category_stats.values())} 条")
     print("=" * 70)
     
     return final_articles
@@ -288,7 +351,7 @@ def format_message(articles):
         lines.append("")
     
     lines.append("=" * 50)
-    lines.append(f"💡 _智能筛选 + 英文翻译 + 简报总结_")
+    lines.append(f"💡 _免费翻译 (MyMemory) + AI 智能总结 (OpenRouter)_")
     
     return '\n'.join(lines)
 
@@ -352,8 +415,8 @@ def main():
     print(f"   - 每类最多：15 条")
     print(f"   - 最小标题长度：{config['settings'].get('min_title_length', 8)}")
     print(f"   - 黑名单：{', '.join(config['settings'].get('blacklist_keywords', []))}")
-    print(f"   - 英文翻译：✅ 开启")
-    print(f"   - 简报总结：✅ 开启")
+    print(f"   - 免费翻译：✅ MyMemory API")
+    print(f"   - AI 总结：✅ OpenRouter (stepfun/step-3.5-flash:free)")
     print("=" * 70)
     
     articles = fetch_feeds(config)
