@@ -3,36 +3,151 @@
     {
       "name": "量子位",
       "url": "https://www.qbitai.com/rss",
-      "category": "AI 资讯"
+      "category": "🤖 AI 资讯",
+      "weight": 10,
+      "keywords": ["AI", "大模型", "人工智能", "算法", "深度学习"]
+    },
+    {
+      "name": "机器之心",
+      "url": "https://www.jiqizhixin.com/rss",
+      "category": "🤖 AI 资讯",
+      "weight": 10,
+      "keywords": ["AI", "机器学习", "大模型", "神经网络"]
+    },
+    {
+      "name": "AI 科技评论",
+      "url": "https://www.aitechtalk.com/rss",
+      "category": "🤖 AI 资讯",
+      "weight": 9,
+      "keywords": ["AI", "人工智能", "技术"]
+    },
+    {
+      "name": "OpenAI",
+      "url": "https://openai.com/blog/rss.xml",
+      "category": "🤖 AI 资讯",
+      "weight": 10,
+      "keywords": ["GPT", "AI", "model"],
+      "language": "en"
+    },
+    {
+      "name": "Hugging Face",
+      "url": "https://huggingface.co/blog/feed.xml",
+      "category": "🤖 AI 资讯",
+      "weight": 8,
+      "keywords": ["model", "AI", "transformer"],
+      "language": "en"
     },
     {
       "name": "36 氪",
       "url": "https://36kr.com/feed",
-      "category": "科技资讯"
+      "category": "💻 科技资讯",
+      "weight": 10,
+      "keywords": ["科技", "创业", "融资", "互联网"]
     },
     {
       "name": "钛媒体",
       "url": "https://www.tmtpost.com/rss.xml",
-      "category": "科技资讯"
+      "category": "💻 科技资讯",
+      "weight": 9,
+      "keywords": ["科技", "商业", "互联网"]
     },
     {
       "name": "少数派",
       "url": "https://sspai.com/feed",
-      "category": "科技资讯"
+      "category": "💻 科技资讯",
+      "weight": 8,
+      "keywords": ["效率", "工具", "软件"]
     },
     {
-      "name": "OpenAI Blog",
-      "url": "https://openai.com/blog/rss.xml",
-      "category": "AI 资讯"
+      "name": "虎嗅",
+      "url": "https://www.huxiu.com/rss/",
+      "category": "💻 科技资讯",
+      "weight": 8,
+      "keywords": ["商业", "科技", "评论"]
     },
     {
       "name": "TechCrunch",
       "url": "https://techcrunch.com/feed/",
-      "category": "科技资讯"
+      "category": "💻 科技资讯",
+      "weight": 7,
+      "keywords": ["startup", "tech", "AI"],
+      "language": "en"
+    },
+    {
+      "name": "财联社",
+      "url": "https://www.cls.cn/rss/",
+      "category": "📈 财经资讯",
+      "weight": 10,
+      "keywords": ["财经", "股票", "市场", "金融"]
+    },
+    {
+      "name": "华尔街见闻",
+      "url": "https://wallstreetcn.com/rss/",
+      "category": "📈 财经资讯",
+      "weight": 9,
+      "keywords": ["财经", "全球", "市场"]
+    },
+    {
+      "name": "东方财富",
+      "url": "https://www.eastmoney.com/rss/",
+      "category": "📈 财经资讯",
+      "weight": 8,
+      "keywords": ["股票", "财经"]
+    },
+    {
+      "name": "联合早报",
+      "url": "https://www.zaobao.com/rss/",
+      "category": "🌍 国际新闻",
+      "weight": 9,
+      "keywords": ["国际", "新闻", "亚洲"]
+    },
+    {
+      "name": "澎湃新闻",
+      "url": "https://www.thepaper.cn/rss/",
+      "category": "🌍 国际新闻",
+      "weight": 8,
+      "keywords": ["新闻", "时事"]
+    },
+    {
+      "name": "C114 通信网",
+      "url": "https://www.c114.com.cn/rss/",
+      "category": "📡 通信运营商",
+      "weight": 10,
+      "keywords": ["通信", "5G", "运营商", "移动", "电信", "联通"]
+    },
+    {
+      "name": "通信世界网",
+      "url": "https://www.cww.net.cn/rss/",
+      "category": "📡 通信运营商",
+      "weight": 9,
+      "keywords": ["通信", "电信", "网络"]
+    },
+    {
+      "name": "飞象网",
+      "url": "https://www.cctime.com/rss/",
+      "category": "📡 通信运营商",
+      "weight": 8,
+      "keywords": ["通信", "互联网"]
+    },
+    {
+      "name": "审计署",
+      "url": "https://www.audit.gov.cn/n1992130/n1992150/rss.xml",
+      "category": "🔍 审计领域",
+      "weight": 10,
+      "keywords": ["审计", "监督", "财经"]
+    },
+    {
+      "name": "中国会计视野",
+      "url": "https://www.esnai.com/rss/",
+      "category": "🔍 审计领域",
+      "weight": 8,
+      "keywords": ["会计", "审计", "财务"]
     }
   ],
   "settings": {
-    "max_items_per_feed": 5,
-    "max_total_items": 20
+    "max_items_per_feed": 10,
+    "max_total_items": 60,
+    "min_title_length": 10,
+    "blacklist_keywords": ["广告", "推广", "赞助", "直播", "招聘", "活动", "会议", "培训", "课程", "优惠", "促销"]
   }
 }
