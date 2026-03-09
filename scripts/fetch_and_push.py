@@ -18,10 +18,11 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 }
 
-# OpenRouter 配置（主模型）
+# OpenRouter 配置（主模型）- 改用确认可用的免费模型
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
 OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = "stepfun/step-3.5-flash:free"
+# 使用确认免费的 Meta Llama 3 模型
+OPENROUTER_MODEL = "meta-llama/llama-3-8b-instruct:free"
 
 # Google Gemini 配置（备用模型）
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyBPBoLcA_yC_S1udnDrzRCvKIISHsO4UTk')
@@ -140,21 +141,21 @@ def ai_translate_and_summarize(title, content, index=0):
     return f"[翻译失败] {title[:40]}..."
 
 def try_stepfun(title, clean_content, log_entry):
-    """尝试 stepfun 模型"""
-    prompt = f"""你是一个专业的新闻编辑。请将以下英文新闻翻译成中文并总结：
+    """尝试 Llama 3 模型"""
+    # 简单直接的英文提示词（Llama 3 对英文指令理解更好）
+    prompt = f"""Translate this English news to Chinese and summarize in 60-100 Chinese characters:
 
-【英文原文】
-标题：{title}
-内容：{clean_content}
+Title: {title}
+Content: {clean_content}
 
-【要求】
-1. 必须翻译成中文
-2. 用 60-100 字概括核心内容
-3. 保留关键数据、人名、公司名
-4. 输出纯中文，不要保留英文句子
-5. 直接输出翻译结果，不要其他说明
+Requirements:
+1. MUST output ONLY Chinese
+2. Summarize the key facts (who, what, result)
+3. Keep important numbers and names
+4. Output 60-100 Chinese characters
+5. Do NOT include English sentences
 
-【中文翻译】"""
+Chinese summary:"""
     
     try:
         start_time = time.time()
@@ -255,7 +256,7 @@ def fetch_feeds(feeds_config):
     print(f"\n🤖 双模型故障转移:")
     print(f"   主模型：{OPENROUTER_MODEL} (OpenRouter)")
     print(f"   备用：Google Gemini 2.0 Flash")
-    print(f"   策略：stepfun 失败 → 自动切换 Gemini")
+    print(f"   策略：Llama 3 失败 → 自动切换 Gemini")
     print("=" * 70)
     
     for feed_config in feeds_config['feeds']:
