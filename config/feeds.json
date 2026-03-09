@@ -74,73 +74,90 @@
       "language": "en"
     },
     {
-      "name": "财联社",
-      "url": "https://www.cls.cn/rss/",
+      "name": "彭博社",
+      "url": "https://www.bloomberg.com/feed",
       "category": "📈 财经资讯",
       "weight": 10,
-      "keywords": []
+      "keywords": [],
+      "language": "en"
     },
     {
-      "name": "华尔街见闻",
-      "url": "https://wallstreetcn.com/rss/",
+      "name": "路透社财经",
+      "url": "https://www.reuters.com/finance/feed",
       "category": "📈 财经资讯",
       "weight": 9,
-      "keywords": []
+      "keywords": [],
+      "language": "en"
     },
     {
-      "name": "东方财富",
-      "url": "https://www.eastmoney.com/rss/",
+      "name": "CNBC",
+      "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
       "category": "📈 财经资讯",
       "weight": 8,
-      "keywords": []
+      "keywords": [],
+      "language": "en"
     },
     {
-      "name": "联合早报",
-      "url": "https://www.zaobao.com/rss/",
+      "name": "BBC 国际",
+      "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
       "category": "🌍 国际新闻",
       "weight": 9,
-      "keywords": []
+      "keywords": [],
+      "language": "en"
     },
     {
-      "name": "澎湃新闻",
-      "url": "https://www.thepaper.cn/rss/",
+      "name": "CNN 国际",
+      "url": "http://rss.cnn.com/rss/edition.rss",
       "category": "🌍 国际新闻",
       "weight": 8,
-      "keywords": []
+      "keywords": [],
+      "language": "en"
     },
     {
-      "name": "C114 通信网",
-      "url": "https://www.c114.com.cn/rss/",
+      "name": "Guardian",
+      "url": "https://www.theguardian.com/world/rss",
+      "category": "🌍 国际新闻",
+      "weight": 8,
+      "keywords": [],
+      "language": "en"
+    },
+    {
+      "name": "FierceWireless",
+      "url": "https://www.fiercewireless.com/rss.xml",
       "category": "📡 通信运营商",
       "weight": 10,
-      "keywords": []
+      "keywords": [],
+      "language": "en"
     },
     {
-      "name": "通信世界网",
-      "url": "https://www.cww.net.cn/rss/",
+      "name": "Light Reading",
+      "url": "https://www.lightreading.com/rss.xml",
       "category": "📡 通信运营商",
       "weight": 9,
-      "keywords": []
+      "keywords": [],
+      "language": "en"
     },
     {
-      "name": "审计署",
-      "url": "https://www.audit.gov.cn/n1992130/n1992150/rss.xml",
+      "name": "Reuters 审计",
+      "url": "https://www.reuters.com/business/finance/accounting-audit/feed",
       "category": "🔍 审计领域",
       "weight": 10,
-      "keywords": []
+      "keywords": [],
+      "language": "en"
     },
     {
-      "name": "中国会计视野",
-      "url": "https://www.esnai.com/rss/",
+      "name": "Accounting Today",
+      "url": "https://www.accountingtoday.com/rss",
       "category": "🔍 审计领域",
       "weight": 8,
-      "keywords": []
+      "keywords": [],
+      "language": "en"
     }
   ],
   "settings": {
     "max_items_per_feed": 15,
     "max_per_category": 15,
     "min_title_length": 8,
-    "blacklist_keywords": ["广告", "推广", "赞助", "直播", "招聘", "活动", "会议", "培训", "课程", "优惠", "促销", "抽奖", "福利", " enroll", "webinar"]
+    "blacklist_keywords": ["广告", "推广", "赞助", "直播", "招聘", "活动", "会议", "培训", "课程", "优惠", "促销", "抽奖", "福利", "enroll", "webinar", "sponsored", "advertisement"]
   }
 }
