@@ -1,0 +1,38 @@
+{
+  "feeds": [
+    {
+      "name": "量子位",
+      "url": "https://www.qbitai.com/rss",
+      "category": "AI 资讯"
+    },
+    {
+      "name": "36 氪",
+      "url": "https://36kr.com/feed",
+      "category": "科技资讯"
+    },
+    {
+      "name": "钛媒体",
+      "url": "https://www.tmtpost.com/rss.xml",
+      "category": "科技资讯"
+    },
+    {
+      "name": "少数派",
+      "url": "https://sspai.com/feed",
+      "category": "科技资讯"
+    },
+    {
+      "name": "OpenAI Blog",
+      "url": "https://openai.com/blog/rss.xml",
+      "category": "AI 资讯"
+    },
+    {
+      "name": "TechCrunch",
+      "url": "https://techcrunch.com/feed/",
+      "category": "科技资讯"
+    }
+  ],
+  "settings": {
+    "max_items_per_feed": 5,
+    "max_total_items": 20
+  }
+}
