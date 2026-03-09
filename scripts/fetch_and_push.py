@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
-RSS 每日摘要 - 双模型故障转移
-主模型：stepfun/step-3.5-flash:free (OpenRouter)
-备用：Google Gemini 2.0 Flash (Google AI Studio)
+RSS 每日摘要 - 带详细日志记录
 """
 
 import json
@@ -18,18 +16,17 @@ HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 }
 
-# OpenRouter 配置（主模型）- 改用确认可用的免费模型
+# OpenRouter 配置
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
 OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
-# 使用确认免费的 Meta Llama 3 模型
 OPENROUTER_MODEL = "meta-llama/llama-3-8b-instruct:free"
 
-# Google Gemini 配置（备用模型）
+# Gemini 配置
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyBPBoLcA_yC_S1udnDrzRCvKIISHsO4UTk')
 GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview:generateContent"
 
-# 日志记录
-API_LOGS = []
+# 详细日志
+DETAILED_LOGS = []
 
 def load_feeds():
     config_path = Path(__file__).parent.parent / 'config' / 'feeds.json'
@@ -37,7 +34,7 @@ def load_feeds():
         return json.load(f)
 
 def translate_with_gemini(title, content):
-    """使用 Google Gemini 翻译"""
+    """Gemini 翻译"""
     clean_content = re.sub(r'<[^>]+>', '', content)
     clean_content = re.sub(r'\s+', ' ', clean_content).strip()[:600]
     
@@ -53,15 +50,8 @@ Output ONLY the Chinese summary, no other text:"""
             f"{GEMINI_ENDPOINT}?key={GEMINI_API_KEY}",
             headers={'Content-Type': 'application/json'},
             json={
-                "contents": [{
-                    "parts": [{
-                        "text": prompt
-                    }]
-                }],
-                "generationConfig": {
-                    "maxOutputTokens": 200,
-                    "temperature": 0.3
-                }
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"maxOutputTokens": 200, "temperature": 0.3}
             },
             timeout=30
         )
@@ -72,77 +62,68 @@ Output ONLY the Chinese summary, no other text:"""
                 summary = result['candidates'][0]['content']['parts'][0]['text'].strip()
                 summary = summary.strip('"\'')
                 
-                # 验证翻译
                 if len(summary) > 20 and re.search(r'[A-Za-z]{10,}', summary):
-                    return None  # 翻译失败
+                    return None
                 
                 return summary[:120] + ('...' if len(summary) > 120 else '')
         
         return None
         
     except Exception as e:
-        print(f"  ⚠️ Gemini 失败：{e}")
         return None
 
 def ai_translate_and_summarize(title, content, index=0):
-    """AI 翻译 + 总结，带故障转移"""
+    """AI 翻译 + 总结，带详细日志"""
     if not content:
         return f"📰 {title}"
     
-    # 清理 HTML
     clean_content = re.sub(r'<[^>]+>', '', content)
     clean_content = re.sub(r'\s+', ' ', clean_content).strip()
     
-    # 检测是否英文
     is_english = not re.search(r'[\u4e00-\u9fff]', title + clean_content)
     
-    # 中文直接返回
     if not is_english:
         clean_content = re.sub(r'📰', '', clean_content)
         return clean_content[:120] + ('...' if len(clean_content) > 120 else '')
     
-    # 截取
     clean_content = clean_content[:600]
     
     log_entry = {
         'index': index,
-        'title': title[:50],
-        'content_len': len(clean_content),
-        'request_time': datetime.now().isoformat()
+        'title': title,
+        'content_preview': content[:200],
+        'timestamp': datetime.now().isoformat()
     }
     
-    # 尝试 1：stepfun (OpenRouter)
-    print(f"  🔄 尝试 stepfun...")
-    stepfun_result = try_stepfun(title, clean_content, log_entry)
+    # 尝试 Llama 3
+    llama_result = try_llama3(title, clean_content, log_entry)
     
-    if stepfun_result and not stepfun_result.startswith('['):
-        log_entry['model'] = 'stepfun'
+    if llama_result and not llama_result.startswith('['):
+        log_entry['model'] = 'llama3'
         log_entry['success'] = True
-        API_LOGS.append(log_entry)
-        return stepfun_result
+        log_entry['result'] = llama_result
+        DETAILED_LOGS.append(log_entry)
+        return llama_result
     
-    # 尝试 2：Google Gemini（故障转移）
-    print(f"  🔄 stepfun 失败，尝试 Gemini...")
+    # 尝试 Gemini
     gemini_result = translate_with_gemini(title, clean_content)
     
     if gemini_result:
         log_entry['model'] = 'gemini'
         log_entry['success'] = True
         log_entry['fallback'] = True
-        API_LOGS.append(log_entry)
-        print(f"  ✅ Gemini 成功")
+        log_entry['result'] = gemini_result
+        DETAILED_LOGS.append(log_entry)
         return gemini_result
     
-    # 都失败了
+    # 都失败
     log_entry['model'] = 'both_failed'
     log_entry['success'] = False
-    API_LOGS.append(log_entry)
-    print(f"  ❌ 两个模型都失败")
+    DETAILED_LOGS.append(log_entry)
     return f"[翻译失败] {title[:40]}..."
 
-def try_stepfun(title, clean_content, log_entry):
+def try_llama3(title, clean_content, log_entry):
     """尝试 Llama 3 模型"""
-    # 简单直接的英文提示词（Llama 3 对英文指令理解更好）
     prompt = f"""Translate this English news to Chinese and summarize in 60-100 Chinese characters:
 
 Title: {title}
@@ -156,6 +137,11 @@ Requirements:
 5. Do NOT include English sentences
 
 Chinese summary:"""
+    
+    log_entry['llama3_request'] = {
+        'model': OPENROUTER_MODEL,
+        'prompt_preview': prompt[:200]
+    }
     
     try:
         start_time = time.time()
@@ -171,7 +157,7 @@ Chinese summary:"""
             json={
                 'model': OPENROUTER_MODEL,
                 'messages': [
-                    {'role': 'system', 'content': '你是一个专业的中文新闻翻译。用户输入英文时，你必须用中文回复。'},
+                    {'role': 'system', 'content': 'You are a professional Chinese news translator. When user inputs English, you MUST reply in Chinese only.'},
                     {'role': 'user', 'content': prompt}
                 ],
                 'max_tokens': 200,
@@ -181,8 +167,15 @@ Chinese summary:"""
         )
         
         elapsed = time.time() - start_time
-        log_entry['stepfun_time_ms'] = int(elapsed * 1000)
-        log_entry['stepfun_status'] = response.status_code
+        log_entry['llama3_response_time_ms'] = int(elapsed * 1000)
+        log_entry['llama3_status'] = response.status_code
+        
+        # 记录完整响应
+        try:
+            response_json = response.json()
+            log_entry['llama3_response_raw'] = json.dumps(response_json, ensure_ascii=False)[:1000]
+        except:
+            log_entry['llama3_response_raw'] = response.text[:500]
         
         if response.status_code == 200:
             result = response.json()
@@ -191,11 +184,11 @@ Chinese summary:"""
                 summary = result['choices'][0]['message']['content'].strip()
                 summary = summary.strip('"\'')
                 
-                log_entry['stepfun_response'] = summary[:100]
+                log_entry['llama3_response_text'] = summary
                 
-                # 验证翻译
+                # 验证
                 if len(summary) > 20 and re.search(r'[A-Za-z]{10,}', summary):
-                    log_entry['stepfun_error'] = '翻译失败 - 返回英文'
+                    log_entry['llama3_error'] = '翻译失败 - 返回英文'
                     return f"[翻译失败] {title[:40]}..."
                 
                 if len(summary) > 120:
@@ -203,20 +196,17 @@ Chinese summary:"""
                 
                 return summary
             
-            log_entry['stepfun_error'] = f'响应格式错误：{result}'
+            log_entry['llama3_error'] = f'响应格式错误：{result}'
             return f"[格式错误] {title[:40]}..."
         
-        log_entry['stepfun_error'] = f'HTTP {response.status_code}: {response.text[:100]}'
-        print(f"  ❌ stepfun 失败：{response.status_code}")
+        log_entry['llama3_error'] = f'HTTP {response.status_code}: {response.text[:200]}'
         return f"[API 错误{response.status_code}] {title[:40]}..."
         
     except requests.exceptions.Timeout:
-        log_entry['stepfun_error'] = '请求超时'
-        print(f"  ⏱️ stepfun 超时")
+        log_entry['llama3_error'] = '请求超时'
         return f"[超时] {title[:40]}..."
     except Exception as e:
-        log_entry['stepfun_error'] = str(e)
-        print(f"  ❌ stepfun 异常：{e}")
+        log_entry['llama3_error'] = str(e)
         return f"[错误] {title[:40]}..."
 
 def is_quality_article(title, summary, config):
@@ -254,9 +244,8 @@ def fetch_feeds(feeds_config):
     category_stats = {}
     
     print(f"\n🤖 双模型故障转移:")
-    print(f"   主模型：{OPENROUTER_MODEL} (OpenRouter)")
+    print(f"   主模型：{OPENROUTER_MODEL}")
     print(f"   备用：Google Gemini 2.0 Flash")
-    print(f"   策略：Llama 3 失败 → 自动切换 Gemini")
     print("=" * 70)
     
     for feed_config in feeds_config['feeds']:
@@ -273,7 +262,7 @@ def fetch_feeds(feeds_config):
             category = feed_config['category']
             
             if category not in category_stats:
-                category_stats[category] = {'fetched': 0, 'passed': 0, 'failed': 0, 'stepfun_ok': 0, 'gemini_ok': 0, 'fail': 0}
+                category_stats[category] = {'fetched': 0, 'passed': 0, 'failed': 0, 'llama3_ok': 0, 'gemini_ok': 0, 'fail': 0}
             
             article_index = 0
             
@@ -299,21 +288,19 @@ def fetch_feeds(feeds_config):
                 
                 brief = ai_translate_and_summarize(title, summary, article_index)
                 
-                # 统计
                 if brief.startswith('[翻译失败]'):
                     category_stats[category]['fail'] += 1
                     print(f"      ❌ {brief[:50]}")
                 elif is_english:
-                    # 检查是用哪个模型成功的
-                    last_log = API_LOGS[-1] if API_LOGS else {}
+                    last_log = DETAILED_LOGS[-1] if DETAILED_LOGS else {}
                     if last_log.get('model') == 'gemini':
                         category_stats[category]['gemini_ok'] += 1
                         print(f"      ✅ (Gemini) {brief[:40]}...")
                     else:
-                        category_stats[category]['stepfun_ok'] += 1
-                        print(f"      ✅ (stepfun) {brief[:40]}...")
+                        category_stats[category]['llama3_ok'] += 1
+                        print(f"      ✅ (Llama3) {brief[:40]}...")
                 else:
-                    category_stats[category]['stepfun_ok'] += 1
+                    category_stats[category]['llama3_ok'] += 1
                 
                 time.sleep(0.1)
                 
@@ -340,33 +327,40 @@ def fetch_feeds(feeds_config):
         status = "✅" if stats['passed'] > 0 else "❌"
         print(f"{status} {cat}:")
         print(f"   抓取{stats['fetched']}条 → 通过{stats['passed']}条 → 过滤{stats['failed']}条")
-        print(f"   stepfun 成功{stats['stepfun_ok']}条 → Gemini 救场{stats['gemini_ok']}条 → 失败{stats['fail']}条")
+        print(f"   Llama3 成功{stats['llama3_ok']}条 → Gemini 救场{stats['gemini_ok']}条 → 失败{stats['fail']}条")
     
-    # API 日志摘要
+    # API 统计
     print("\n" + "=" * 70)
     print("📝 API 调用统计:")
     print("=" * 70)
     
-    stepfun_success = sum(1 for log in API_LOGS if log.get('model') == 'stepfun' and log.get('success'))
-    gemini_success = sum(1 for log in API_LOGS if log.get('model') == 'gemini' and log.get('success'))
-    both_failed = sum(1 for log in API_LOGS if log.get('model') == 'both_failed')
+    llama3_success = sum(1 for log in DETAILED_LOGS if log.get('model') == 'llama3' and log.get('success'))
+    gemini_success = sum(1 for log in DETAILED_LOGS if log.get('model') == 'gemini' and log.get('success'))
+    both_failed = sum(1 for log in DETAILED_LOGS if log.get('model') == 'both_failed')
     
-    print(f"总调用：{len(API_LOGS)} 次")
-    print(f"stepfun 成功：{stepfun_success} 次")
-    print(f"Gemini 救场：{gemini_success} 次 ← 故障转移成功")
+    print(f"总调用：{len(DETAILED_LOGS)} 次")
+    print(f"Llama3 成功：{llama3_success} 次")
+    print(f"Gemini 救场：{gemini_success} 次")
     print(f"两个都失败：{both_failed} 次")
     
     if both_failed > 0:
-        print(f"\n失败详情:")
-        for log in API_LOGS:
+        print(f"\n失败详情 (前 10 条):")
+        for log in DETAILED_LOGS:
             if log.get('model') == 'both_failed':
-                print(f"  [{log['index']:2d}] {log['title'][:40]}...")
+                print(f"  [{log['index']:2d}] {log['title'][:50]}...")
+                if 'llama3_error' in log:
+                    print(f"      Llama3 错误：{log['llama3_error']}")
+                if 'llama3_status' in log:
+                    print(f"      HTTP 状态：{log['llama3_status']}")
     
-    # 保存日志
-    log_file = Path(__file__).parent.parent / 'api_logs.json'
+    # 保存详细日志到文件
+    log_file = Path(__file__).parent.parent / 'detailed_api_logs.json'
     with open(log_file, 'w', encoding='utf-8') as f:
-        json.dump(API_LOGS, f, ensure_ascii=False, indent=2)
-    print(f"\n📄 详细日志：{log_file}")
+        json.dump(DETAILED_LOGS, f, ensure_ascii=False, indent=2)
+    
+    print(f"\n📄 详细日志已保存：{log_file}")
+    print(f"   共 {len(DETAILED_LOGS)} 条记录")
+    print(f"   文件大小：{os.path.getsize(log_file) / 1024:.1f} KB")
     
     # 分组排序
     by_category = {}
@@ -430,7 +424,7 @@ def format_message(articles):
         lines.append("")
     
     lines.append("=" * 50)
-    lines.append(f"💡 _双模型翻译：stepfun → Gemini 故障转移_")
+    lines.append(f"💡 _AI 翻译：Llama 3 + Gemini 故障转移_")
     
     return '\n'.join(lines)
 
@@ -464,7 +458,7 @@ def push_to_feishu(message):
 
 def main():
     print("=" * 70)
-    print("🚀 RSS 智能摘要 - 双模型故障转移")
+    print("🚀 RSS 智能摘要 - 带详细日志")
     print("=" * 70)
     
     config = load_feeds()
