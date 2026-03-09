@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RSS 每日摘要 - 智能筛选 + 翻译 + 完整分类版本
+RSS 每日摘要 - 智能筛选 + 翻译 + 简报总结版本
 """
 
 import json
@@ -12,7 +12,7 @@ import os
 import re
 import time
 
-# 设置 User-Agent，避免被拒绝
+# 设置 User-Agent
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
@@ -31,32 +31,38 @@ def translate_text(text, target_lang='zh'):
     if not text:
         return text
     
-    # 检查是否包含中文
+    # 检查是否已经是中文
     if re.search(r'[\u4e00-\u9fff]', text):
         return text
     
     try:
-        text_to_translate = text[:500]
+        # 截取前 400 字翻译
+        text_to_translate = text[:400]
+        
         url = "https://api.mymemory.translated.net/get"
         params = {
             "q": text_to_translate,
             "langpair": "en|zh"
         }
         
-        response = requests.get(url, params=params, timeout=10, headers=HEADERS)
+        response = requests.get(url, params=params, timeout=15, headers=HEADERS)
         
         if response.status_code == 200:
             result = response.json()
             translated = result.get('responseData', {}).get('translatedText', text)
             
-            if len(text) > 500:
+            # 如果翻译失败或返回原文
+            if not translated or translated == text:
+                return text
+            
+            if len(text) > 400:
                 return translated + "..."
             return translated
         
         return text
         
     except Exception as e:
-        print(f"  ⚠️ 翻译失败：{e}")
+        print(f"  ⚠️ 翻译异常：{e}")
         return text
 
 def is_quality_article(title, summary, config):
@@ -87,36 +93,52 @@ def match_keywords(title, summary, keywords):
     
     return matches / len(keywords) if keywords else 0
 
-def generate_summary(title, summary, max_length=100):
-    """生成简短摘要"""
-    if summary:
-        clean_summary = re.sub(r'<[^>]+>', '', summary)
-        clean_summary = re.sub(r'\s+', ' ', clean_summary).strip()
-        clean_summary = re.sub(r'作者 [丨|].*?编辑 [丨|].*?\s*', '', clean_summary)
-        clean_summary = re.sub(r'作者 [丨|].*?\s*', '', clean_summary)
-        
-        if len(clean_summary) > max_length:
-            return clean_summary[:max_length-3] + '...'
-        return clean_summary if clean_summary else f"📰 {title}"
+def generate_news_brief(title, summary, max_length=120):
+    """
+    生成新闻简报式总结
+    提取关键信息，而不是简单截取
+    """
+    if not summary:
+        return f"📰 {title}"
     
-    return f"📰 {title[:60]}..." if len(title) > 60 else f"📰 {title}"
+    # 清理 HTML 标签
+    clean = re.sub(r'<[^>]+>', '', summary)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    
+    # 清理作者信息
+    clean = re.sub(r'作者 [丨|].*?编辑 [丨|].*?\s*', '', clean)
+    clean = re.sub(r'作者 [丨|].*?\s*', '', clean)
+    clean = re.sub(r'By\s+.*?\|', '', clean)
+    
+    # 清理无意义前缀
+    clean = re.sub(r'^\s*(Summary|摘要|简介|Introduction)[:：]?\s*', '', clean, flags=re.IGNORECASE)
+    
+    # 提取关键句（按句号分割，取第一句）
+    sentences = re.split(r'[.!?。！？]', clean)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
+    
+    if sentences:
+        # 取前 1-2 句作为摘要
+        brief = '. '.join(sentences[:2])
+        if len(brief) > max_length:
+            brief = brief[:max_length-3] + '...'
+        return brief
+    
+    # 如果没有合适的句子，直接截取
+    if len(clean) > max_length:
+        return clean[:max_length-3] + '...'
+    return clean if clean else f"📰 {title}"
 
 def fetch_feed_with_headers(url):
-    """
-    使用自定义 Headers 抓取 RSS
-    避免被服务器拒绝
-    """
+    """使用自定义 Headers 抓取 RSS"""
     try:
-        # 先下载内容
         response = requests.get(url, headers=HEADERS, timeout=30)
         response.raise_for_status()
-        
-        # 用 feedparser 解析
         feed = feedparser.parse(response.content)
         return feed
     except Exception as e:
         print(f"  ❌ 抓取失败：{e}")
-        return feedparser.parse(url)  # 回退到默认方式
+        return feedparser.parse(url)
 
 def fetch_feeds(feeds_config):
     """抓取所有 RSS 源"""
@@ -129,7 +151,6 @@ def fetch_feeds(feeds_config):
         try:
             print(f"\n📰 抓取：{feed_config['name']} ({feed_config['category']})")
             
-            # 使用自定义 Headers 抓取
             feed = fetch_feed_with_headers(feed_config['url'])
             
             if not feed.entries:
@@ -142,7 +163,7 @@ def fetch_feeds(feeds_config):
             is_english = feed_config.get('language', 'zh') == 'en'
             
             if category not in category_stats:
-                category_stats[category] = {'fetched': 0, 'passed': 0, 'failed': 0}
+                category_stats[category] = {'fetched': 0, 'passed': 0, 'failed': 0, 'translated': 0}
             
             for entry in feed.entries[:settings.get('max_items_per_feed', 15)]:
                 total_fetched += 1
@@ -161,18 +182,21 @@ def fetch_feeds(feeds_config):
                 
                 # 翻译英文内容
                 if is_english:
+                    print(f"  🌐 翻译：{title[:40]}...")
                     title = translate_text(title)
                     summary = translate_text(summary)
-                    time.sleep(0.1)
+                    category_stats[category]['translated'] += 1
+                    time.sleep(0.15)  # 避免 API 限流
                 
-                short_summary = generate_summary(title, summary)
+                # 生成简报式摘要
+                brief = generate_news_brief(title, summary)
                 
                 article = {
                     'category': category,
                     'source': feed_config['name'],
                     'title': title,
                     'link': entry.link,
-                    'summary': short_summary,
+                    'summary': brief,
                     'published': entry.get('published', ''),
                     'weight': weight,
                     'match_score': match_score,
@@ -185,12 +209,13 @@ def fetch_feeds(feeds_config):
             print(f"❌ 抓取失败 {feed_config['name']}: {e}")
     
     # 打印统计
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 70)
     print("📊 分类统计:")
-    print("=" * 60)
+    print("=" * 70)
     for cat, stats in category_stats.items():
         status = "✅" if stats['passed'] > 0 else "❌"
-        print(f"{status} {cat}: 抓取{stats['fetched']}条 → 通过{stats['passed']}条 → 过滤{stats['failed']}条")
+        trans_info = f" (翻译{stats['translated']}条)" if stats['translated'] > 0 else ""
+        print(f"{status} {cat}: 抓取{stats['fetched']}条 → 通过{stats['passed']}条 → 过滤{stats['failed']}条{trans_info}")
     
     # 按分类分组
     by_category = {}
@@ -207,8 +232,8 @@ def fetch_feeds(feeds_config):
         final_articles.extend(items[:15])
     
     total_passed = sum(len(items) for items in by_category.values())
-    print(f"\n✅ 总计：{total_fetched} 条原始内容 → {total_passed} 条优质文章")
-    print("=" * 60)
+    print(f"\n✅ 总计：{total_fetched} 条 → {total_passed} 条优质文章")
+    print("=" * 70)
     
     return final_articles
 
@@ -263,7 +288,7 @@ def format_message(articles):
         lines.append("")
     
     lines.append("=" * 50)
-    lines.append(f"💡 _智能筛选：过滤广告/推广/标题党，英文内容自动翻译_")
+    lines.append(f"💡 _智能筛选 + 英文翻译 + 简报总结_")
     
     return '\n'.join(lines)
 
@@ -271,13 +296,11 @@ def push_to_feishu(message):
     """推送到飞书"""
     webhook = os.environ.get('FEISHU_WEBHOOK')
     
-    print(f"\n🔍 调试信息:")
-    print(f"   Webhook 配置：{'✅ 已配置' if webhook else '❌ 未配置'}")
-    if webhook:
-        print(f"   Webhook 前缀：{webhook[:50]}...")
+    print(f"\n🔍 推送调试:")
+    print(f"   Webhook: {'✅ 已配置' if webhook else '❌ 未配置'}")
     
     if not webhook:
-        print("⚠️ 未配置飞书 Webhook，仅打印消息")
+        print("⚠️ 未配置 Webhook，仅打印")
         print("\n" + message[:500] + "...")
         return
     
@@ -301,10 +324,10 @@ def push_to_feishu(message):
             }
         }
         
-        print(f"   发送请求到飞书...")
+        print(f"   发送请求...")
         response = requests.post(webhook, json=payload, timeout=30, headers=HEADERS)
         
-        print(f"   响应状态码：{response.status_code}")
+        print(f"   响应：{response.status_code}")
         
         if response.status_code == 200:
             result = response.json()
@@ -312,15 +335,15 @@ def push_to_feishu(message):
             print(f"   响应：{result}")
         else:
             print(f"❌ 飞书推送失败：{response.status_code}")
-            print(f"   响应内容：{response.text}")
+            print(f"   内容：{response.text}")
             
     except Exception as e:
         print(f"❌ 推送异常：{e}")
 
 def main():
-    print("=" * 60)
+    print("=" * 70)
     print("🚀 RSS 智能摘要 - 开始抓取")
-    print("=" * 60)
+    print("=" * 70)
     
     config = load_feeds()
     print(f"📋 共配置 {len(config['feeds'])} 个 RSS 源")
@@ -330,7 +353,8 @@ def main():
     print(f"   - 最小标题长度：{config['settings'].get('min_title_length', 8)}")
     print(f"   - 黑名单：{', '.join(config['settings'].get('blacklist_keywords', []))}")
     print(f"   - 英文翻译：✅ 开启")
-    print("=" * 60)
+    print(f"   - 简报总结：✅ 开启")
+    print("=" * 70)
     
     articles = fetch_feeds(config)
     
@@ -341,9 +365,9 @@ def main():
     message = format_message(articles)
     push_to_feishu(message)
     
-    print("=" * 60)
+    print("=" * 70)
     print("✅ 完成")
-    print("=" * 60)
+    print("=" * 70)
 
 if __name__ == '__main__':
     main()
