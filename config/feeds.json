@@ -78,83 +78,69 @@
       "url": "https://www.cls.cn/rss/",
       "category": "📈 财经资讯",
       "weight": 10,
-      "keywords": ["财经", "股票", "市场", "金融", "投资"]
+      "keywords": []
     },
     {
       "name": "华尔街见闻",
       "url": "https://wallstreetcn.com/rss/",
       "category": "📈 财经资讯",
       "weight": 9,
-      "keywords": ["财经", "全球", "市场", "经济"]
+      "keywords": []
     },
     {
       "name": "东方财富",
       "url": "https://www.eastmoney.com/rss/",
       "category": "📈 财经资讯",
       "weight": 8,
-      "keywords": ["股票", "财经", "基金", "证券"]
+      "keywords": []
     },
     {
       "name": "联合早报",
       "url": "https://www.zaobao.com/rss/",
       "category": "🌍 国际新闻",
       "weight": 9,
-      "keywords": ["国际", "新闻", "亚洲", "中国"]
+      "keywords": []
     },
     {
       "name": "澎湃新闻",
       "url": "https://www.thepaper.cn/rss/",
       "category": "🌍 国际新闻",
       "weight": 8,
-      "keywords": ["新闻", "时事", "社会"]
-    },
-    {
-      "name": "参考消息",
-      "url": "http://www.cankaoxiaoxi.com/rss/gdxw.xml",
-      "category": "🌍 国际新闻",
-      "weight": 8,
-      "keywords": ["国际", "新闻", "全球"]
+      "keywords": []
     },
     {
       "name": "C114 通信网",
       "url": "https://www.c114.com.cn/rss/",
       "category": "📡 通信运营商",
       "weight": 10,
-      "keywords": ["通信", "5G", "运营商", "移动", "电信", "联通", "网络"]
+      "keywords": []
     },
     {
       "name": "通信世界网",
       "url": "https://www.cww.net.cn/rss/",
       "category": "📡 通信运营商",
       "weight": 9,
-      "keywords": ["通信", "电信", "网络", "5G"]
-    },
-    {
-      "name": "飞象网",
-      "url": "https://www.cctime.com/rss/",
-      "category": "📡 通信运营商",
-      "weight": 8,
-      "keywords": ["通信", "互联网", "电信"]
+      "keywords": []
     },
     {
       "name": "审计署",
       "url": "https://www.audit.gov.cn/n1992130/n1992150/rss.xml",
       "category": "🔍 审计领域",
       "weight": 10,
-      "keywords": ["审计", "监督", "财经", "检查"]
+      "keywords": []
     },
     {
       "name": "中国会计视野",
       "url": "https://www.esnai.com/rss/",
       "category": "🔍 审计领域",
       "weight": 8,
-      "keywords": ["会计", "审计", "财务", "税务"]
+      "keywords": []
     }
   ],
   "settings": {
     "max_items_per_feed": 15,
     "max_per_category": 15,
-    "min_title_length": 10,
-    "blacklist_keywords": ["广告", "推广", "赞助", "直播", "招聘", "活动", "会议", "培训", "课程", "优惠", "促销", "抽奖", "福利"]
+    "min_title_length": 8,
+    "blacklist_keywords": ["广告", "推广", "赞助", "直播", "招聘", "活动", "会议", "培训", "课程", "优惠", "促销", "抽奖", "福利", " enroll", "webinar"]
   }
 }

@@ -68,27 +68,25 @@ def is_quality_article(title, summary, config):
     判断文章质量，过滤低质内容
     """
     # 标题太短
-    if len(title) < config.get('min_title_length', 10):
+    if len(title) < config.get('min_title_length', 8):  # 降低到 8 字
         return False
     
     # 黑名单关键词过滤
     blacklist = config.get('blacklist_keywords', [])
     text = title + ' ' + (summary or '')
+    text_lower = text.lower()
     
     for keyword in blacklist:
-        if keyword.lower() in text.lower():
+        if keyword.lower() in text_lower:
             return False
     
-    # 标题党特征过滤
+    # 标题党特征过滤（放宽）
     clickbait_patterns = [
         r'震惊 [！!]',
         r'重磅 [！!]',
-        r'刚刚 [！!]',
         r'速看',
         r'删前速看',
         r'不转不是',
-        r'clickbait',
-        r'you won\'t believe',
     ]
     
     for pattern in clickbait_patterns:
@@ -108,7 +106,11 @@ def match_keywords(title, summary, keywords):
     text = (title + ' ' + (summary or '')).lower()
     matches = sum(1 for kw in keywords if kw.lower() in text)
     
-    return matches / len(keywords) if keywords else 1
+    # 放宽匹配阈值：只要匹配 1 个词就算通过
+    if matches >= 1:
+        return 0.5 + (matches / len(keywords)) * 0.5
+    
+    return matches / len(keywords) if keywords else 0
 
 def generate_summary(title, summary, max_length=100):
     """
@@ -120,10 +122,14 @@ def generate_summary(title, summary, max_length=100):
         clean_summary = re.sub(r'<[^>]+>', '', summary)
         clean_summary = re.sub(r'\s+', ' ', clean_summary).strip()
         
+        # 清理作者信息（36 氪等来源的"作者丨xxx 编辑丨xxx"）
+        clean_summary = re.sub(r'作者 [丨|].*?编辑 [丨|].*?\s*', '', clean_summary)
+        clean_summary = re.sub(r'作者 [丨|].*?\s*', '', clean_summary)
+        
         # 截取
         if len(clean_summary) > max_length:
             return clean_summary[:max_length-3] + '...'
-        return clean_summary
+        return clean_summary if clean_summary else f"📰 {title}"
     
     # 没有摘要时，简单描述
     return f"📰 {title[:60]}..." if len(title) > 60 else f"📰 {title}"
@@ -135,6 +141,7 @@ def fetch_feeds(feeds_config):
     articles = []
     settings = feeds_config.get('settings', {})
     total_fetched = 0
+    category_stats = {}  # 统计每类抓取数量
     
     for feed_config in feeds_config['feeds']:
         try:
@@ -150,21 +157,22 @@ def fetch_feeds(feeds_config):
             category = feed_config['category']
             is_english = feed_config.get('language', 'zh') == 'en'
             
-            for entry in feed.entries[:settings.get('max_items_per_feed', 10)]:
+            if category not in category_stats:
+                category_stats[category] = {'fetched': 0, 'passed': 0}
+            
+            for entry in feed.entries[:settings.get('max_items_per_feed', 15)]:
                 total_fetched += 1
+                category_stats[category]['fetched'] += 1
+                
                 title = entry.title
                 summary = entry.get('summary', '')
                 
                 # 质量筛选
                 if not is_quality_article(title, summary, settings):
-                    print(f"  ⏭️  过滤低质：{title[:30]}...")
                     continue
                 
-                # 关键词匹配
+                # 关键词匹配（放宽）
                 match_score = match_keywords(title, summary, keywords)
-                if match_score < 0.2:  # 匹配度低于 20% 的过滤
-                    print(f"  ⏭️  关键词不匹配：{title[:30]}...")
-                    continue
                 
                 # 翻译英文内容
                 if is_english:
@@ -188,9 +196,15 @@ def fetch_feeds(feeds_config):
                     'score': weight * match_score,  # 综合评分
                 }
                 articles.append(article)
+                category_stats[category]['passed'] += 1
                 
         except Exception as e:
             print(f"❌ 抓取失败 {feed_config['name']}: {e}")
+    
+    # 打印统计
+    print("\n📊 分类统计:")
+    for cat, stats in category_stats.items():
+        print(f"  {cat}: 抓取{stats['fetched']}条 → 通过{stats['passed']}条")
     
     # 按分类分组
     by_category = {}
@@ -206,7 +220,8 @@ def fetch_feeds(feeds_config):
         items.sort(key=lambda x: x['score'], reverse=True)
         final_articles.extend(items[:15])  # 每类最多 15 条
     
-    print(f"✅ 抓取到 {total_fetched} 条原始内容，筛选后 {len(final_articles)} 条优质文章")
+    total_passed = sum(len(items) for items in by_category.values())
+    print(f"\n✅ 抓取到 {total_fetched} 条原始内容，筛选后 {total_passed} 条优质文章")
     
     return final_articles
 
@@ -248,6 +263,10 @@ def format_message(articles):
     
     for category in category_order:
         if category not in by_category:
+            lines.append(f"\n{category} (0 条)")
+            lines.append("-" * 40)
+            lines.append("_今日暂无相关内容_")
+            lines.append("")
             continue
         
         items = by_category[category]
@@ -321,9 +340,9 @@ def main():
     config = load_feeds()
     print(f"📋 共配置 {len(config['feeds'])} 个 RSS 源")
     print(f"📊 筛选规则:")
-    print(f"   - 每源最多：{config['settings'].get('max_items_per_feed', 10)} 条")
+    print(f"   - 每源最多：{config['settings'].get('max_items_per_feed', 15)} 条")
     print(f"   - 每类最多：15 条")
-    print(f"   - 最小标题长度：{config['settings'].get('min_title_length', 10)}")
+    print(f"   - 最小标题长度：{config['settings'].get('min_title_length', 8)}")
     print(f"   - 黑名单：{', '.join(config['settings'].get('blacklist_keywords', []))}")
     print(f"   - 英文翻译：✅ 开启")
     print("=" * 60)
