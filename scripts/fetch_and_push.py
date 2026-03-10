@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-RSS 每日摘要 - Gemini 翻译
-GitHub Actions 在国外，可直接访问 Google AI Studio
+RSS 每日摘要 - OpenRouter 免费模型翻译
+模型：google/gemma-3-4b-it:free (正常输出，无 reasoning)
 """
 
 import json
@@ -15,9 +15,11 @@ import time
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-# Gemini 配置（GitHub Actions 可访问）
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+# OpenRouter 配置
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+# 使用正常模型（非 reasoning）
+OPENROUTER_MODEL = "google/gemma-3-4b-it:free"
 
 DETAILED_LOGS = []
 
@@ -28,28 +30,34 @@ def load_feeds():
         return json.load(f)
 
 
-def translate_with_gemini(title, content):
-    """Gemini 翻译（无思考过程，直接输出）"""
-    if not GEMINI_API_KEY:
+def translate_with_openrouter(title, content):
+    """OpenRouter 免费模型翻译"""
+    if not OPENROUTER_API_KEY:
         return None
     
-    prompt = f"Translate this news to Chinese summary (60-100 characters). Output ONLY the Chinese summary, no other text:\n\nTitle: {title}\nContent: {content[:400]}\n\nChinese summary:"
+    prompt = f"Translate this news to Chinese summary (60-100 characters). Output ONLY the Chinese summary:\n\nTitle: {title}\nContent: {content[:400]}\n\nChinese summary:"
     
     try:
         resp = requests.post(
-            f"{GEMINI_ENDPOINT}?key={GEMINI_API_KEY}",
-            headers={'Content-Type': 'application/json'},
+            OPENROUTER_ENDPOINT,
+            headers={
+                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://github.com/SuperAvenger/rss-digest',
+                'X-Title': 'RSS Digest'
+            },
             json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"maxOutputTokens": 200, "temperature": 0.3}
+                'model': OPENROUTER_MODEL,
+                'messages': [{'role': 'user', 'content': prompt}],
+                'max_tokens': 200
             },
             timeout=30
         )
         
         if resp.status_code == 200:
             result = resp.json()
-            if 'candidates' in result and result['candidates']:
-                summary = result['candidates'][0]['content']['parts'][0]['text'].strip()
+            if 'choices' in result and result['choices']:
+                summary = result['choices'][0]['message']['content'].strip()
                 summary = summary.strip('"\'')
                 if re.search(r'[\u4e00-\u9fff]', summary):
                     return summary[:120]
@@ -78,13 +86,13 @@ def ai_translate_and_summarize(title, content, index=0):
         'timestamp': datetime.now().isoformat()
     }
     
-    # 用 Gemini 翻译
-    gemini_result = translate_with_gemini(title, clean_content)
-    if gemini_result:
-        log_entry['model'] = 'gemini'
+    # 用 OpenRouter 翻译
+    result = translate_with_openrouter(title, clean_content)
+    if result:
+        log_entry['model'] = OPENROUTER_MODEL
         log_entry['success'] = True
         DETAILED_LOGS.append(log_entry)
-        return gemini_result
+        return result
     
     # 失败：保留英文原文
     log_entry['model'] = 'fallback'
@@ -127,8 +135,8 @@ def fetch_feeds(feeds_config):
     category_stats = {}
     
     print(f"\n🤖 翻译配置:")
-    print(f"   模型：Gemini 2.0 Flash")
-    print(f"   API Key: {'✅' if GEMINI_API_KEY else '❌'}")
+    print(f"   模型：{OPENROUTER_MODEL}")
+    print(f"   API Key: {'✅' if OPENROUTER_API_KEY else '❌'}")
     print("=" * 70)
     
     for feed_config in feeds_config['feeds']:
@@ -203,11 +211,11 @@ def fetch_feeds(feeds_config):
         print(f"{cat}: 抓取{stats['fetched']} → 通过{stats['passed']} → 翻译{stats['translated']} → 英文{stats['english']}")
     
     # API 统计
-    gemini_ok = sum(1 for log in DETAILED_LOGS if log.get('model') == 'gemini' and log.get('success'))
+    success = sum(1 for log in DETAILED_LOGS if log.get('success'))
     failed = sum(1 for log in DETAILED_LOGS if not log.get('success'))
     
     print(f"\n📝 API 统计:")
-    print(f"   Gemini 成功：{gemini_ok} 次")
+    print(f"   翻译成功：{success} 次")
     print(f"   降级英文：{failed} 次")
     
     # 保存日志
@@ -287,7 +295,7 @@ def push_to_feishu(message):
 
 def main():
     print("=" * 70)
-    print("🚀 RSS 智能摘要 - Gemini 翻译")
+    print("🚀 RSS 智能摘要 - OpenRouter 免费模型")
     print("=" * 70)
     
     config = load_feeds()
