@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-RSS 每日摘要 - OpenRouter 免费模型翻译
-模型：google/gemma-3-4b-it:free (正常输出，无 reasoning)
+RSS 每日摘要 - Kimi (Moonshot) 翻译
 """
 
 import json
@@ -15,11 +14,10 @@ import time
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-# OpenRouter 配置
-OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
-OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
-# 使用正常模型（非 reasoning）
-OPENROUTER_MODEL = "google/gemma-3-4b-it:free"
+# Kimi (Moonshot) 配置
+KIMI_API_KEY = os.environ.get('KIMI_API_KEY', '')
+KIMI_ENDPOINT = "https://api.moonshot.cn/v1/chat/completions"
+KIMI_MODEL = "kimi-k2-0905-preview"
 
 DETAILED_LOGS = []
 
@@ -30,25 +28,22 @@ def load_feeds():
         return json.load(f)
 
 
-def translate_with_openrouter(title, content):
-    """OpenRouter 免费模型翻译"""
-    if not OPENROUTER_API_KEY:
+def translate_with_kimi(title, content):
+    """Kimi 翻译"""
+    if not KIMI_API_KEY:
         return None
     
-    # 用中文 prompt，要求只输出中文（简短）
-    prompt = f"用 50-80 字中文总结以下新闻，只输出摘要，不要英文、括号或解释：\n\n标题：{title}\n内容：{content[:300]}\n\n摘要："
+    prompt = f"将以下新闻总结为 50-80 字中文摘要，只输出中文内容，不要英文、括号或解释：\n\n标题：{title}\n内容：{content[:400]}\n\n摘要："
     
     try:
         resp = requests.post(
-            OPENROUTER_ENDPOINT,
+            KIMI_ENDPOINT,
             headers={
-                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://github.com/SuperAvenger/rss-digest',
-                'X-Title': 'RSS Digest'
+                'Authorization': f'Bearer {KIMI_API_KEY}',
+                'Content-Type': 'application/json'
             },
             json={
-                'model': OPENROUTER_MODEL,
+                'model': KIMI_MODEL,
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 200
             },
@@ -59,18 +54,14 @@ def translate_with_openrouter(title, content):
             result = resp.json()
             if 'choices' in result and result['choices']:
                 summary = result['choices'][0]['message']['content'].strip()
-                # 清理：去掉英文括号和括号内的英文
+                # 清理英文括号和括号内容
                 summary = re.sub(r'\s*\([^)]*\)', '', summary)
-                summary = re.sub(r'\s*\(.*?\)', '', summary)
                 summary = summary.strip('"\'')
-                # 只保留中文部分
+                # 提取中文
                 if re.search(r'[\u4e00-\u9fff]', summary):
-                    # 提取中文（包括标点）
                     chinese = re.findall(r'[\u4e00-\u9fff，。！？；：""''、…—]+', summary)
                     if chinese:
-                        result_text = ''.join(chinese)
-                        if len(result_text) >= 10:
-                            return result_text[:120]
+                        return ''.join(chinese)[:120]
                     return summary[:120]
         return None
     except Exception as e:
@@ -97,10 +88,10 @@ def ai_translate_and_summarize(title, content, index=0):
         'timestamp': datetime.now().isoformat()
     }
     
-    # 用 OpenRouter 翻译
-    result = translate_with_openrouter(title, clean_content)
+    # 用 Kimi 翻译
+    result = translate_with_kimi(title, clean_content)
     if result:
-        log_entry['model'] = OPENROUTER_MODEL
+        log_entry['model'] = KIMI_MODEL
         log_entry['success'] = True
         DETAILED_LOGS.append(log_entry)
         return result
@@ -146,8 +137,8 @@ def fetch_feeds(feeds_config):
     category_stats = {}
     
     print(f"\n🤖 翻译配置:")
-    print(f"   模型：{OPENROUTER_MODEL}")
-    print(f"   API Key: {'✅' if OPENROUTER_API_KEY else '❌'}")
+    print(f"   模型：{KIMI_MODEL}")
+    print(f"   API Key: {'✅' if KIMI_API_KEY else '❌'}")
     print("=" * 70)
     
     for feed_config in feeds_config['feeds']:
@@ -177,7 +168,6 @@ def fetch_feeds(feeds_config):
                 summary = entry.get('summary', '')
                 
                 if not is_quality_article(title, summary, settings):
-                    category_stats[category]['failed'] += 1
                     continue
                 
                 match_score = match_keywords(title, summary, keywords)
@@ -208,7 +198,7 @@ def fetch_feeds(feeds_config):
                     'summary': brief,
                     'weight': weight,
                     'match_score': match_score,
-                    'score': weight,  # 只用来源权重排序
+                    'score': weight,
                     'published': entry.get('published_parsed') or entry.get('updated_parsed'),
                 })
                 category_stats[category]['passed'] += 1
@@ -236,13 +226,12 @@ def fetch_feeds(feeds_config):
         json.dump(DETAILED_LOGS, f, ensure_ascii=False, indent=2)
     print(f"\n📄 日志已保存：{log_file}")
     
-    # 排序：每个分类内按来源权重排序（权重相同则按时间倒序）
+    # 排序：每个分类内按来源权重排序
     by_category = {}
     for article in articles:
         by_category.setdefault(article['category'], []).append(article)
     
     def sort_key(article):
-        # 主要：权重（高→低），次要：时间（新→旧）
         time_val = 0
         if article.get('published'):
             try:
@@ -295,8 +284,7 @@ def format_message(articles):
 def push_to_feishu(message):
     webhook = os.environ.get('FEISHU_WEBHOOK')
     if not webhook:
-        print("⚠️ 未配置飞书 Webhook")
-        print(message[:500])
+        print("\n⚠️ 未配置飞书 Webhook，打印消息预览")
         return
     
     try:
@@ -319,7 +307,7 @@ def push_to_feishu(message):
 
 def main():
     print("=" * 70)
-    print("🚀 RSS 智能摘要 - OpenRouter 免费模型")
+    print("🚀 RSS 智能摘要 - Kimi (Moonshot)")
     print("=" * 70)
     
     config = load_feeds()
@@ -331,9 +319,17 @@ def main():
         return
     
     message = format_message(articles)
+    
+    # 打印消息预览
+    print("\n" + "=" * 70)
+    print("📱 推送消息预览")
+    print("=" * 70)
+    print(message)
+    
+    # 推送
     push_to_feishu(message)
     
-    print("=" * 70)
+    print("\n" + "=" * 70)
     print("✅ 完成")
 
 

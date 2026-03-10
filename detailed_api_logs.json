@@ -1,0 +1,30 @@
+[
+  {
+    "index": 1,
+    "title": "OpenAI to acquire Promptfoo",
+    "timestamp": "2026-03-10T13:00:33.535300",
+    "model": "kimi-k2-0905-preview",
+    "success": true
+  },
+  {
+    "index": 2,
+    "title": "How Descript enables multilingual video dubbing at scale",
+    "timestamp": "2026-03-10T13:00:37.646845",
+    "model": "kimi-k2-0905-preview",
+    "success": true
+  },
+  {
+    "index": 3,
+    "title": "Codex Security: now in research preview",
+    "timestamp": "2026-03-10T13:00:42.087772",
+    "model": "kimi-k2-0905-preview",
+    "success": true
+  },
+  {
+    "index": 4,
+    "title": "How Balyasny Asset Management built an AI research engine for investing",
+    "timestamp": "2026-03-10T13:00:46.018233",
+    "model": "kimi-k2-0905-preview",
+    "success": true
+  }
+]
