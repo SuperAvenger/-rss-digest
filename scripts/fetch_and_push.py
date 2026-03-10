@@ -208,7 +208,8 @@ def fetch_feeds(feeds_config):
                     'summary': brief,
                     'weight': weight,
                     'match_score': match_score,
-                    'score': weight * match_score,
+                    'score': weight,  # 只用来源权重排序
+                    'published': entry.get('published_parsed') or entry.get('updated_parsed'),
                 })
                 category_stats[category]['passed'] += 1
                 
@@ -235,14 +236,24 @@ def fetch_feeds(feeds_config):
         json.dump(DETAILED_LOGS, f, ensure_ascii=False, indent=2)
     print(f"\n📄 日志已保存：{log_file}")
     
-    # 排序
+    # 排序：每个分类内按来源权重排序（权重相同则按时间倒序）
     by_category = {}
     for article in articles:
         by_category.setdefault(article['category'], []).append(article)
     
+    def sort_key(article):
+        # 主要：权重（高→低），次要：时间（新→旧）
+        time_val = 0
+        if article.get('published'):
+            try:
+                time_val = time.mktime(article['published'])
+            except:
+                pass
+        return (article['score'], time_val)
+    
     final_articles = []
     for cat, items in by_category.items():
-        items.sort(key=lambda x: x['score'], reverse=True)
+        items.sort(key=sort_key, reverse=True)
         final_articles.extend(items[:15])
     
     print(f"\n✅ 总计：{total_fetched} → {len(final_articles)}")
