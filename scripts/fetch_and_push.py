@@ -35,7 +35,8 @@ def translate_with_openrouter(title, content):
     if not OPENROUTER_API_KEY:
         return None
     
-    prompt = f"Translate this news to Chinese summary (60-100 characters). Output ONLY the Chinese summary:\n\nTitle: {title}\nContent: {content[:400]}\n\nChinese summary:"
+    # 用中文 prompt，要求只输出中文（简短）
+    prompt = f"用 50-80 字中文总结以下新闻，只输出摘要，不要英文、括号或解释：\n\n标题：{title}\n内容：{content[:300]}\n\n摘要："
     
     try:
         resp = requests.post(
@@ -58,8 +59,18 @@ def translate_with_openrouter(title, content):
             result = resp.json()
             if 'choices' in result and result['choices']:
                 summary = result['choices'][0]['message']['content'].strip()
+                # 清理：去掉英文括号和括号内的英文
+                summary = re.sub(r'\s*\([^)]*\)', '', summary)
+                summary = re.sub(r'\s*\(.*?\)', '', summary)
                 summary = summary.strip('"\'')
+                # 只保留中文部分
                 if re.search(r'[\u4e00-\u9fff]', summary):
+                    # 提取中文（包括标点）
+                    chinese = re.findall(r'[\u4e00-\u9fff，。！？；：""''、…—]+', summary)
+                    if chinese:
+                        result_text = ''.join(chinese)
+                        if len(result_text) >= 10:
+                            return result_text[:120]
                     return summary[:120]
         return None
     except Exception as e:
@@ -246,6 +257,9 @@ def format_message(articles):
     for article in articles:
         by_category.setdefault(article['category'], []).append(article)
     
+    # 按文章数量从多到少排序
+    sorted_categories = sorted(by_category.items(), key=lambda x: len(x[1]), reverse=True)
+    
     lines = [
         f"📰 **每日新闻摘要** ({datetime.now().strftime('%Y年%m月%d日')})",
         f"共 **{len(articles)}** 条",
@@ -253,8 +267,7 @@ def format_message(articles):
         ""
     ]
     
-    for category in ['🤖 AI 资讯', '💻 科技资讯', '📈 财经资讯', '🌍 国际新闻', '📡 通信运营商', '🔍 审计领域']:
-        items = by_category.get(category, [])
+    for category, items in sorted_categories:
         lines.append(f"\n{category} ({len(items)}条)")
         lines.append("-" * 40)
         
