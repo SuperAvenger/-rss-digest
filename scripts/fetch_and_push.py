@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-RSS 每日摘要 - Kimi (Moonshot) 翻译
+RSS 每日摘要 - OpenRouter 免费模型翻译
+模型：google/gemma-3-4b-it:free
 """
 
 import json
@@ -14,10 +15,10 @@ import time
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-# Kimi (Moonshot) 配置
-KIMI_API_KEY = os.environ.get('KIMI_API_KEY', '')
-KIMI_ENDPOINT = "https://api.moonshot.cn/v1/chat/completions"
-KIMI_MODEL = "kimi-k2-0905-preview"
+# OpenRouter 配置
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = "google/gemma-3-4b-it:free"
 
 DETAILED_LOGS = []
 
@@ -28,22 +29,24 @@ def load_feeds():
         return json.load(f)
 
 
-def translate_with_kimi(title, content):
-    """Kimi 翻译"""
-    if not KIMI_API_KEY:
+def translate_with_openrouter(title, content):
+    """OpenRouter 免费模型翻译"""
+    if not OPENROUTER_API_KEY:
         return None
     
-    prompt = f"将以下新闻总结为 50-80 字中文摘要，只输出中文内容，不要英文、括号或解释：\n\n标题：{title}\n内容：{content[:400]}\n\n摘要："
+    prompt = f"用 50-80 字中文总结以下新闻，只输出中文内容，不要英文、括号或解释：\n\n标题：{title}\n内容：{content[:400]}\n\n摘要："
     
     try:
         resp = requests.post(
-            KIMI_ENDPOINT,
+            OPENROUTER_ENDPOINT,
             headers={
-                'Authorization': f'Bearer {KIMI_API_KEY}',
-                'Content-Type': 'application/json'
+                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://github.com/SuperAvenger/rss-digest',
+                'X-Title': 'RSS Digest'
             },
             json={
-                'model': KIMI_MODEL,
+                'model': OPENROUTER_MODEL,
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 200
             },
@@ -54,10 +57,8 @@ def translate_with_kimi(title, content):
             result = resp.json()
             if 'choices' in result and result['choices']:
                 summary = result['choices'][0]['message']['content'].strip()
-                # 清理英文括号和括号内容
                 summary = re.sub(r'\s*\([^)]*\)', '', summary)
                 summary = summary.strip('"\'')
-                # 提取中文
                 if re.search(r'[\u4e00-\u9fff]', summary):
                     chinese = re.findall(r'[\u4e00-\u9fff，。！？；：""''、…—]+', summary)
                     if chinese:
@@ -76,7 +77,6 @@ def ai_translate_and_summarize(title, content, index=0):
     clean_content = re.sub(r'<[^>]+>', '', content)
     clean_content = re.sub(r'\s+', ' ', clean_content).strip()
     
-    # 中文内容直接返回
     if re.search(r'[\u4e00-\u9fff]', title + clean_content):
         return clean_content[:120] + ('...' if len(clean_content) > 120 else '')
     
@@ -88,15 +88,13 @@ def ai_translate_and_summarize(title, content, index=0):
         'timestamp': datetime.now().isoformat()
     }
     
-    # 用 Kimi 翻译
-    result = translate_with_kimi(title, clean_content)
+    result = translate_with_openrouter(title, clean_content)
     if result:
-        log_entry['model'] = KIMI_MODEL
+        log_entry['model'] = OPENROUTER_MODEL
         log_entry['success'] = True
         DETAILED_LOGS.append(log_entry)
         return result
     
-    # 失败：保留英文原文
     log_entry['model'] = 'fallback'
     log_entry['success'] = False
     DETAILED_LOGS.append(log_entry)
@@ -137,8 +135,8 @@ def fetch_feeds(feeds_config):
     category_stats = {}
     
     print(f"\n🤖 翻译配置:")
-    print(f"   模型：{KIMI_MODEL}")
-    print(f"   API Key: {'✅' if KIMI_API_KEY else '❌'}")
+    print(f"   模型：{OPENROUTER_MODEL}")
+    print(f"   API Key: {'✅' if OPENROUTER_API_KEY else '❌'}")
     print("=" * 70)
     
     for feed_config in feeds_config['feeds']:
@@ -206,13 +204,11 @@ def fetch_feeds(feeds_config):
         except Exception as e:
             print(f"❌ 抓取失败 {feed_config['name']}: {e}")
     
-    # 统计
     print("\n" + "=" * 70)
     print("📊 分类统计:")
     for cat, stats in category_stats.items():
         print(f"{cat}: 抓取{stats['fetched']} → 通过{stats['passed']} → 翻译{stats['translated']} → 英文{stats['english']}")
     
-    # API 统计
     success = sum(1 for log in DETAILED_LOGS if log.get('success'))
     failed = sum(1 for log in DETAILED_LOGS if not log.get('success'))
     
@@ -220,13 +216,11 @@ def fetch_feeds(feeds_config):
     print(f"   翻译成功：{success} 次")
     print(f"   降级英文：{failed} 次")
     
-    # 保存日志
     log_file = Path(__file__).parent.parent / 'detailed_api_logs.json'
     with open(log_file, 'w', encoding='utf-8') as f:
         json.dump(DETAILED_LOGS, f, ensure_ascii=False, indent=2)
     print(f"\n📄 日志已保存：{log_file}")
     
-    # 排序：每个分类内按来源权重排序
     by_category = {}
     for article in articles:
         by_category.setdefault(article['category'], []).append(article)
@@ -257,7 +251,6 @@ def format_message(articles):
     for article in articles:
         by_category.setdefault(article['category'], []).append(article)
     
-    # 按文章数量从多到少排序
     sorted_categories = sorted(by_category.items(), key=lambda x: len(x[1]), reverse=True)
     
     lines = [
@@ -285,6 +278,10 @@ def push_to_feishu(message):
     webhook = os.environ.get('FEISHU_WEBHOOK')
     if not webhook:
         print("\n⚠️ 未配置飞书 Webhook，打印消息预览")
+        print("\n" + "=" * 70)
+        print("📱 推送消息预览")
+        print("=" * 70)
+        print(message)
         return
     
     try:
@@ -296,7 +293,7 @@ def push_to_feishu(message):
             }
         }
         resp = requests.post(webhook, json=payload, timeout=30)
-        print(f"飞书推送：{resp.status_code}")
+        print(f"\n飞书推送：{resp.status_code}")
         if resp.status_code == 200:
             print("✅ 推送成功！")
         else:
@@ -307,7 +304,7 @@ def push_to_feishu(message):
 
 def main():
     print("=" * 70)
-    print("🚀 RSS 智能摘要 - Kimi (Moonshot)")
+    print("🚀 RSS 智能摘要 - OpenRouter")
     print("=" * 70)
     
     config = load_feeds()
@@ -319,14 +316,6 @@ def main():
         return
     
     message = format_message(articles)
-    
-    # 打印消息预览
-    print("\n" + "=" * 70)
-    print("📱 推送消息预览")
-    print("=" * 70)
-    print(message)
-    
-    # 推送
     push_to_feishu(message)
     
     print("\n" + "=" * 70)
