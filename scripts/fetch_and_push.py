@@ -31,9 +31,10 @@ def load_feeds():
 def translate_with_kimi(title, content):
     """Kimi 翻译"""
     if not KIMI_API_KEY:
+        print(f"  [Kimi] 缺少 API Key")
         return None
     
-    prompt = f"将以下新闻总结为 50-80 字中文摘要，只输出中文内容，不要英文、括号或解释：\n\n标题：{title}\n内容：{content[:400]}\n\n摘要："
+    prompt = f"用 50-80 字中文总结以下新闻，只输出中文内容：\n\n标题：{title}\n内容：{content[:400]}\n\n摘要："
     
     try:
         resp = requests.post(
@@ -50,19 +51,28 @@ def translate_with_kimi(title, content):
             timeout=30
         )
         
+        print(f"  [Kimi] 状态码：{resp.status_code}")
+        
         if resp.status_code == 200:
             result = resp.json()
+            print(f"  [Kimi] 响应：{result}")
             if 'choices' in result and result['choices']:
                 summary = result['choices'][0]['message']['content'].strip()
-                summary = re.sub(r'\s*\([^)]*\)', '', summary)
-                summary = summary.strip('"\'')
+                print(f"  [Kimi] 摘要：{summary[:80]}...")
+                # 简单清理，保留中文
+                summary = summary.replace('"', '').replace("'", '').strip()
+                # 只要包含中文就返回
                 if re.search(r'[\u4e00-\u9fff]', summary):
-                    chinese = re.findall(r'[\u4e00-\u9fff，。！？；：""''、…—]+', summary)
-                    if chinese:
-                        return ''.join(chinese)[:120]
                     return summary[:120]
+                else:
+                    print(f"  [Kimi] 警告：返回内容不含中文")
+            else:
+                print(f"  [Kimi] 警告：无 choices")
+        else:
+            print(f"  [Kimi] 错误：{resp.text[:200]}")
         return None
     except Exception as e:
+        print(f"  [Kimi] 异常：{e}")
         return None
 
 
