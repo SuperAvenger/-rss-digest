@@ -84,7 +84,16 @@ def ai_translate_and_summarize(title, content, index=0):
     clean_content = re.sub(r'<[^>]+>', '', content)
     clean_content = re.sub(r'\s+', ' ', clean_content).strip()
     
-    if re.search(r'[\u4e00-\u9fff]', title + clean_content):
+    # 判断是否需要翻译：计算中英文比例
+    text = title + ' ' + clean_content
+    chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
+    english_words = len(re.findall(r'[a-zA-Z]+', text))
+    
+    # 如果英文单词数远多于中文字符，需要翻译
+    if english_words > chinese_chars * 3:
+        print(f"  [判断] 英文{english_words} vs 中文{chinese_chars} → 需要翻译")
+    else:
+        print(f"  [判断] 英文{english_words} vs 中文{chinese_chars} → 已有中文")
         return clean_content[:120] + ('...' if len(clean_content) > 120 else '')
     
     clean_content = clean_content[:600]
