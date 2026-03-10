@@ -78,13 +78,12 @@ def translate_with_kimi(title, content):
 
 def ai_translate_and_summarize(title, content, index=0):
     """AI 翻译"""
-    if not content:
-        return f"📰 {title}"
-    
-    clean_content = re.sub(r'<[^>]+>', '', content)
+    clean_content = re.sub(r'<[^>]+>', '', content or '')
     clean_content = re.sub(r'\s+', ' ', clean_content).strip()
     
-    # 判断是否需要翻译：计算中英文比例
+    # 如果 content 为空或与 title 几乎相同，用 title 翻译
+    use_title_only = (not clean_content) or (len(clean_content) < len(title) * 1.5 and title in clean_content)
+    
     text = title + ' ' + clean_content
     chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
     english_words = len(re.findall(r'[a-zA-Z]+', text))
@@ -96,7 +95,8 @@ def ai_translate_and_summarize(title, content, index=0):
         print(f"  [判断] 英文{english_words} vs 中文{chinese_chars} → 已有中文")
         return clean_content[:120] + ('...' if len(clean_content) > 120 else '')
     
-    clean_content = clean_content[:600]
+    # 准备翻译内容
+    translate_content = title if use_title_only else clean_content[:600]
     
     log_entry = {
         'index': index,
@@ -104,7 +104,7 @@ def ai_translate_and_summarize(title, content, index=0):
         'timestamp': datetime.now().isoformat()
     }
     
-    result = translate_with_kimi(title, clean_content)
+    result = translate_with_kimi(title, translate_content)
     if result:
         log_entry['model'] = KIMI_MODEL
         log_entry['success'] = True
@@ -281,7 +281,13 @@ def format_message(articles):
         lines.append("-" * 40)
         
         for i, item in enumerate(items, 1):
-            lines.append(f"\n**{i:2d}. {item['title']}**")
+            # 如果标题是英文但摘要是中文，用摘要前 40 字作为显示标题
+            display_title = item['title']
+            if re.search(r'[\u4e00-\u9fff]', item['summary']) and not re.search(r'[\u4e00-\u9fff]', item['title']):
+                clean_summary = re.sub(r'[📰💡]', '', item['summary']).strip()
+                display_title = clean_summary[:40] + ('...' if len(clean_summary) > 40 else '')
+            
+            lines.append(f"\n**{i:2d}. {display_title}**")
             lines.append(f"📍 {item['source']}")
             lines.append(f"💡 {item['summary']}")
             lines.append(f"🔗 [阅读原文]({item['link']})")
