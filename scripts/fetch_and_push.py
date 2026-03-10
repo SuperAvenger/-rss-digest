@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-RSS 每日摘要 - OpenRouter 免费模型翻译
-模型：google/gemma-3-4b-it:free
+RSS 每日摘要 - Kimi (Moonshot) 翻译
 """
 
 import json
@@ -15,10 +14,10 @@ import time
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-# OpenRouter 配置
-OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
-OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = "google/gemma-3-4b-it:free"
+# Kimi (Moonshot) 配置
+KIMI_API_KEY = os.environ.get('KIMI_API_KEY', '')
+KIMI_ENDPOINT = "https://api.moonshot.cn/v1/chat/completions"
+KIMI_MODEL = "kimi-k2-0905-preview"
 
 DETAILED_LOGS = []
 
@@ -29,24 +28,22 @@ def load_feeds():
         return json.load(f)
 
 
-def translate_with_openrouter(title, content):
-    """OpenRouter 免费模型翻译"""
-    if not OPENROUTER_API_KEY:
+def translate_with_kimi(title, content):
+    """Kimi 翻译"""
+    if not KIMI_API_KEY:
         return None
     
-    prompt = f"用 50-80 字中文总结以下新闻，只输出中文内容，不要英文、括号或解释：\n\n标题：{title}\n内容：{content[:400]}\n\n摘要："
+    prompt = f"将以下新闻总结为 50-80 字中文摘要，只输出中文内容，不要英文、括号或解释：\n\n标题：{title}\n内容：{content[:400]}\n\n摘要："
     
     try:
         resp = requests.post(
-            OPENROUTER_ENDPOINT,
+            KIMI_ENDPOINT,
             headers={
-                'Authorization': f'Bearer {OPENROUTER_API_KEY}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://github.com/SuperAvenger/rss-digest',
-                'X-Title': 'RSS Digest'
+                'Authorization': f'Bearer {KIMI_API_KEY}',
+                'Content-Type': 'application/json'
             },
             json={
-                'model': OPENROUTER_MODEL,
+                'model': KIMI_MODEL,
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 200
             },
@@ -88,9 +85,9 @@ def ai_translate_and_summarize(title, content, index=0):
         'timestamp': datetime.now().isoformat()
     }
     
-    result = translate_with_openrouter(title, clean_content)
+    result = translate_with_kimi(title, clean_content)
     if result:
-        log_entry['model'] = OPENROUTER_MODEL
+        log_entry['model'] = KIMI_MODEL
         log_entry['success'] = True
         DETAILED_LOGS.append(log_entry)
         return result
@@ -135,8 +132,8 @@ def fetch_feeds(feeds_config):
     category_stats = {}
     
     print(f"\n🤖 翻译配置:")
-    print(f"   模型：{OPENROUTER_MODEL}")
-    print(f"   API Key: {'✅' if OPENROUTER_API_KEY else '❌'}")
+    print(f"   模型：{KIMI_MODEL}")
+    print(f"   API Key: {'✅' if KIMI_API_KEY else '❌'}")
     print("=" * 70)
     
     for feed_config in feeds_config['feeds']:
@@ -277,11 +274,7 @@ def format_message(articles):
 def push_to_feishu(message):
     webhook = os.environ.get('FEISHU_WEBHOOK')
     if not webhook:
-        print("\n⚠️ 未配置飞书 Webhook，打印消息预览")
-        print("\n" + "=" * 70)
-        print("📱 推送消息预览")
-        print("=" * 70)
-        print(message)
+        print("\n⚠️ 未配置飞书 Webhook")
         return
     
     try:
@@ -304,7 +297,7 @@ def push_to_feishu(message):
 
 def main():
     print("=" * 70)
-    print("🚀 RSS 智能摘要 - OpenRouter")
+    print("🚀 RSS 智能摘要 - Kimi (Moonshot)")
     print("=" * 70)
     
     config = load_feeds()
