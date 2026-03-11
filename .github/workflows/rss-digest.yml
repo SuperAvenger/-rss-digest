@@ -2,8 +2,8 @@ name: Daily RSS Digest
 
 on:
   schedule:
-    # 每天早上 8:00 北京时间 (UTC 0:00)
-    - cron: '0 0 * * *'
+    # 每天早上 7:00 北京时间 (UTC 23:00) - 预留 1 小时缓冲应对延迟
+    - cron: '0 23 * * *'
   workflow_dispatch: # 允许手动触发
 
 jobs:
