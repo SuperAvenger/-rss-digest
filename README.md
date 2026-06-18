@@ -84,3 +84,13 @@ schedule:
 ## 许可证
 
 MIT
+
+## 维护说明
+
+- 依赖定义在 `requirements.txt`。
+- `detailed_api_logs.json`、缓存和本地环境文件不会提交到仓库。
+- GitHub Actions 默认只需要读取仓库内容；Webhook 和 API Key 通过 GitHub Secrets 注入。
+
+## Roadmap
+
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) for provider modularity, reliable delivery, and MCP expansion priorities.
