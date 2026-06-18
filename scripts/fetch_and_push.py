@@ -55,7 +55,6 @@ def translate_with_kimi(title, content):
         
         if resp.status_code == 200:
             result = resp.json()
-            print(f"  [Kimi] 响应：{result}")
             if 'choices' in result and result['choices']:
                 summary = result['choices'][0]['message']['content'].strip()
                 print(f"  [Kimi] 摘要：{summary[:80]}...")
@@ -300,7 +299,7 @@ def push_to_feishu(message):
     webhook = os.environ.get('FEISHU_WEBHOOK')
     if not webhook:
         print("\n⚠️ 未配置飞书 Webhook")
-        return
+        return False
     
     try:
         payload = {
@@ -312,12 +311,20 @@ def push_to_feishu(message):
         }
         resp = requests.post(webhook, json=payload, timeout=30)
         print(f"\n飞书推送：{resp.status_code}")
-        if resp.status_code == 200:
+        try:
+            response_body = resp.json()
+        except ValueError:
+            response_body = {}
+        business_code = response_body.get("code", response_body.get("StatusCode", 0))
+        if resp.status_code == 200 and business_code == 0:
             print("✅ 推送成功！")
+            return True
         else:
             print(f"❌ 推送失败：{resp.text[:100]}")
+            return False
     except Exception as e:
         print(f"推送失败：{e}")
+        return False
 
 
 def main():
